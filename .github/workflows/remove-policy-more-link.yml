@@ -1,0 +1,31 @@
+name: Remove policy More link
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove More link from policy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          target = '      <a href="#menu" class="more">More →</a>\n'
+          if target not in s:
+              raise SystemExit('More link not found')
+          p.write_text(s.replace(target, '', 1), encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Our PolicyのMoreリンクを削除"
+          git push
