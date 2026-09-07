@@ -73,14 +73,13 @@ jobs:
           set -u
           for attempt in 1 2 3; do
             echo "FTP deploy attempt ${attempt}/3"
-            if timeout 120s lftp -e "
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
               set ftp:ssl-allow no;
               set ftp:passive-mode true;
               set net:timeout 20;
               set net:max-retries 2;
               set net:reconnect-interval-base 5;
               set net:reconnect-interval-max 20;
-              open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
               mirror -R --verbose --parallel=2 --exclude-glob .git* --exclude-glob .github/ --exclude-glob .claude/ --exclude-glob .rate/ --exclude README.txt --exclude config.sample.php ./ /ciao-st.com/public_html/harutabakery/site/;
               bye
             "; then
