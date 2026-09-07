@@ -1,0 +1,44 @@
+name: Restore original header logo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-original-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore original logo in index source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '<span class="brand-text">haruta bakery</span>'
+          new = '<span class="brand-logo" role="img" aria-label="haruta bakery"></span>'
+          if old not in s:
+              raise SystemExit('brand-text target not found')
+          s = s.replace(old, new, 1)
+          extra_style = '\n<style>\n.brand-text{font-family:"Zen Old Mincho",serif;font-size:1.35rem;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--ink);white-space:nowrap}\n</style>\n'
+          s = s.replace(extra_style, '', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify original logo restored
+        run: |
+          grep -q '<span class="brand-logo" role="img" aria-label="haruta bakery"></span>' index.html
+          ! grep -q '<span class="brand-text">haruta bakery</span>' index.html
+      - name: Commit source update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m '左上ヘッダーを元のロゴ画像に戻す'
+          git push
