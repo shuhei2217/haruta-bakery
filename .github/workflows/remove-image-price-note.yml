@@ -1,0 +1,32 @@
+name: Remove image price note
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove requested wording from index.html
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '下は一例です。並ぶパンは日替わり、季節や仕入れで内容が変わります。写真はイメージ。価格は税込。'
+          new = '下は一例です。並ぶパンは日替わり、季節や仕入れで内容が変わります。'
+          if old not in s:
+              raise SystemExit('target text not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "写真イメージと税込表記を削除"
+          git push
