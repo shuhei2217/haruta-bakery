@@ -29,6 +29,7 @@ jobs:
           s = s.replace('<meta property="og:title" content="haruta bakery（制作デモ）">', '<meta property="og:title" content="haruta bakery">')
           s = s.replace('<span class="en">haruta bakery — Kurume &amp; Yame</span>', '<span class="en">haruta bakery<br>— Kurume &amp; Yame —</span>')
           s = s.replace('<p class="meta">久留米店 9:30–17:00／水・土休　|　八女店 9:00–16:00／水・土休　|　売り切れ次第閉店　|　お支払いは現金のみ（営業時間は要確認）</p>', '')
+          s = s.replace('※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。店の投稿・記事の文章を転載したものではなく、最終的な表現は店主の確認が必要です。', '')
           p.write_text(s, encoding='utf-8')
           PY
 
