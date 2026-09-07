@@ -55,6 +55,21 @@ jobs:
           s = re.sub(r'<[^>]*>\s*©\s*haruta bakery（制作デモ）.*?</[^>]+>', '', s, flags=re.S)
           s = re.sub(r'<[^>]*>\s*本ページは制作会社が作成した(?:<[^>]+>)*\**非公式の制作デモ\**.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。\s*</[^>]+>', '', s, flags=re.S)
           s = re.sub(r'本ページは制作会社が作成した.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。', '', s, flags=re.S)
+          # Remove the entire announcement bars, not only their text.
+          bar_texts = [
+              '制作デモ（非公式）：写真はイメージ、価格・営業時間・メニューは店舗提供資料や公開情報に基づく参考値で、店舗に未確認の項目を含みます。',
+              'お知らせ：企業・団体さまの外注注文、まとまった数量のご注文も承ります（【2日前】までにご相談ください）。この欄はデモ用のダミー文です。'
+          ]
+          for text in bar_texts:
+              pos = s.find(text)
+              if pos != -1:
+                  # Prefer removing the nearest complete div container around the bar.
+                  start = s.rfind('<div', 0, pos)
+                  end = s.find('</div>', pos)
+                  if start != -1 and end != -1:
+                      s = s[:start] + s[end + len('</div>'):]
+                  else:
+                      s = s.replace(text, '')
           p.write_text(s, encoding='utf-8')
           PY
 
