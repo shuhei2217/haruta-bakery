@@ -200,7 +200,7 @@
       <a href="#menu">Bread</a>
       <a href="#pricelist">Menu</a>
       <a href="#shops">Shops</a>
-      <a href="https://www.instagram.com/harutabakery2026/" class="ig" target="_blank" rel="noopener" aria-label="Instagram（@harutabakery2026）">
+      <a href="https://www.instagram.com/harutabakery/" class="ig" target="_blank" rel="noopener" aria-label="Instagram（@harutabakery）">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="4"/><circle cx="10" cy="10" r="3.4"/><circle cx="14.4" cy="5.6" r=".9" fill="currentColor"/></svg>
       </a>
       <a href="#order" class="cart">
@@ -381,7 +381,7 @@
       <div class="brand">
         <b>haruta bakery</b>
         <div class="social">
-          <a href="https://www.instagram.com/harutabakery2026/" target="_blank" rel="noopener" aria-label="Instagram（@harutabakery2026）"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="4"/><circle cx="10" cy="10" r="3.4"/><circle cx="14.4" cy="5.6" r=".9" fill="currentColor"/></svg></a>
+          <a href="https://www.instagram.com/harutabakery/" target="_blank" rel="noopener" aria-label="Instagram（@harutabakery）"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="4"/><circle cx="10" cy="10" r="3.4"/><circle cx="14.4" cy="5.6" r=".9" fill="currentColor"/></svg></a>
         </div>
       </div>
       <nav>
@@ -541,7 +541,7 @@ let idc=0;
 Object.entries(MENU).forEach(([cat,items])=>{
   const h=document.createElement('div'); h.className='cg'; h.textContent=cat; itemsBox.appendChild(h);
   items.forEach(([n,p])=>{
-    const id='i'+(idc++); qty[id]={name:n,n:0};
+    const id='i'+(idc++); qty[id]={name:n,n:0,price:p};
     const row=document.createElement('div'); row.className='pick';
     row.innerHTML=`<span class="nm">${n}</span><span class="pp">${yen(p)}</span>
       <span class="qty"><button type="button" aria-label="減らす">−</button><span data-c="${id}">0</span><button type="button" aria-label="増やす">＋</button></span>`;
@@ -554,8 +554,12 @@ Object.entries(MENU).forEach(([cat,items])=>{
   });
 });
 function refreshCount(){
-  const n=Object.values(qty).reduce((s,x)=>s+x.n,0);
-  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点';
+  const values=Object.values(qty);
+  const n=values.reduce((s,x)=>s+x.n,0);
+  const total=values.reduce((s,x)=>s+(x.price==null?0:x.price*x.n),0);
+  const hasMarketPrice=values.some(x=>x.n>0 && x.price==null);
+  const totalText='¥'+total.toLocaleString()+(hasMarketPrice?' ＋ 時価':'')+'（税込）';
+  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点　｜　合計金額：<b>'+totalText+'</b>';
 }
 
 /* ===== 送信 ===== */
