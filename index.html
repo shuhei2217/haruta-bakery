@@ -80,17 +80,24 @@
   .sec .head{border-bottom:1px solid var(--line);padding-bottom:1em;margin-bottom:2.6em}
   .sec .head h2{font-size:1.5rem}
   .sec .head .note{font-size:.8rem;color:var(--taupe);margin-top:.3em}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:46px 30px}
-  @media(max-width:760px){ .grid{grid-template-columns:repeat(2,1fr);gap:32px 20px} }
-  @media(max-width:440px){ .grid{grid-template-columns:1fr} }
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px 22px}
+  @media(max-width:760px){ .grid{grid-template-columns:repeat(3,1fr);gap:26px 16px} }
+  @media(max-width:440px){
+    .grid{grid-template-columns:repeat(2,1fr);gap:18px 12px}
+    .item .badge{font-size:.56rem;padding:.32em .75em;left:8px;bottom:8px}
+    .item .cap{margin-top:.6em}
+    .item .nm{font-size:.8rem}
+    .item .nm small{font-size:.56rem;margin-top:.18em}
+    .item .pr{font-size:.72rem;margin-top:.25em}
+  }
   .item{cursor:pointer}
   .item .ph{aspect-ratio:1/1;width:100%;background:var(--paper-2);border:1px solid var(--line);position:relative;overflow:hidden}
-  .item .badge{position:absolute;left:12px;bottom:12px;background:var(--ink);color:var(--paper);font-size:.66rem;letter-spacing:.1em;padding:.4em 1em;border-radius:999px}
+  .item .badge{position:absolute;left:10px;bottom:10px;background:var(--ink);color:var(--paper);font-size:.6rem;letter-spacing:.1em;padding:.35em .9em;border-radius:999px}
   .item .badge.pop{background:var(--crust)}
-  .item .cap{margin-top:1em}
-  .item .nm{font-size:.95rem}
-  .item .nm small{display:block;color:var(--taupe);font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;margin-top:.25em}
-  .item .pr{font-size:.88rem;color:var(--ink-2);margin-top:.4em}
+  .item .cap{margin-top:.7em}
+  .item .nm{font-size:.84rem}
+  .item .nm small{display:block;color:var(--taupe);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;margin-top:.2em}
+  .item .pr{font-size:.78rem;color:var(--ink-2);margin-top:.3em}
 
   /* 全品・価格表 */
   .pricelist{padding:0 0 92px}
@@ -490,6 +497,8 @@ const HILITE=[
     desc:'一番人気とされるクロワッサン風のパン。層になった生地が特徴。' },
   { name:'もちもち食パン（1斤）', en:'Shokupan', price:250, tone:'#e7d6bd', badge:'定番',
     desc:'毎日食べてもらえるよう価格を抑えた食パン。もちっとした食感。' },
+  { name:'米粉パン', en:'Rice Flour', price:180, tone:'#eddcc0', badge:'',
+    desc:'小麦粉の代わりに米粉を使った食事パン。もちっと軽い食感。' },
   { name:'明太フランス', en:'Mentai', price:380, tone:'#d69a58', badge:'',
     desc:'フランスパンに明太バター。ぴりっと後を引く一本。' },
   { name:'クロックムッシュ', en:'Croque', price:280, tone:'#e2c99a', badge:'',
@@ -498,10 +507,6 @@ const HILITE=[
     desc:'具に焼き牛タンを合わせたカレーパン。調理パンの一つ。' },
   { name:'あんぱん', en:'Anpan', price:180, tone:'#e6cfa8', badge:'',
     desc:'あんこを包んだ基本の菓子パン。白あんぱんもあり。' },
-  { name:'米粉パン', en:'Rice Flour', price:180, tone:'#eddcc0', badge:'',
-    desc:'小麦粉の代わりに米粉を使った食事パン。もちっと軽い食感。' },
-  { name:'ベーグル', en:'Bagel', price:200, tone:'#d9b077', badge:'',
-    desc:'プレーンのベーグル。もちもちとした噛みごたえが特徴。' },
   { name:'りんごのデニッシュ', en:'Apple Danish', price:280, tone:'#eacf9e', badge:'',
     desc:'りんごをのせて焼き上げたデニッシュ。季節のフルーツ版も。' },
   { name:'アボカドシュリンプ', en:'Avocado Shrimp', price:350, tone:'#d8c48a', badge:'',
