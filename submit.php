@@ -143,9 +143,9 @@ if ($hasMail) {
 $acked = false;
 if ($hasMail && $email !== '') {
   $cSubject = '【' . $shopName . '】ご注文を受け付けました（' . $date . ' ' . $time . '）';
-  $cBody = "{$name} 様\n\nこのたびはご注文ありがとうございます。下記の内容で受け付けました。\n担当より折り返しご確認のご連絡をさせていただきます。\n※このメールは自動送信です。ご返信いただいても対応致しかねます。\n\n──────────\n取扱店舗: {$shop}\nお届け方法: {$method}\nお届け先: {$company}\nご住所: {$addr}\n希望日時: {$date} {$time}\nご担当者: {$name} 様\n電話: {$tel}\n──────────\n" . implode("\n", $lines) . "\n";
-  if ($note !== '') $cBody .= "──────────\n備考: {$note}\n";
-  $cBody .= "──────────\n\nお渡しまでに2日間いただきます（【2日前】までにご依頼ください）。\n\nharuta bakery 久留米店　TEL 0942-27-5959\nharuta bakery 八女店　TEL 0943-24-8001\n※本ページは制作デモです。実際のご注文の受付は行っておりません。\n";
+  $cBody = "{$name} 様\n\n{$shopName}です。このたびはご注文ありがとうございます。下記の内容で受け付けました。\n\n──────────\n取扱店舗: {$shop}\nお届け方法: {$method}\nお届け先: {$company}\nご住所: {$addr}\n希望日時: {$date} {$time}\nご担当者: {$name} 様\n電話: {$tel}\n──────────\n" . implode("\n", $lines) . "\n──────────\n";
+  if ($note !== '') $cBody .= "備考: {$note}\n──────────\n";
+  $cBody .= "\nお渡しまでに2日間いただきます（【2日前】までにご依頼ください）。\n担当より折り返しご確認のご連絡をさせていただきますのでお待ちください。\n\n※このメールは自動送信です。ご返信いただいても対応致しかねます。\n\n＜お問い合わせ＞\nharuta bakery 久留米店　TEL 0942-27-5959\nharuta bakery 八女店　TEL 0943-24-8001\n";
   $acked = sendUtf8Mail($email, $cSubject, $cBody, $mailFrom, $mailFrom);
 }
 
