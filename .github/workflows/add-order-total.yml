@@ -1,0 +1,101 @@
+name: Add order total and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-order-total.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add live total to order form
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          old_qty = "const id='i'+(idc++); qty[id]={name:n,n:0};"
+          new_qty = "const id='i'+(idc++); qty[id]={name:n,n:0,price:p};"
+          if old_qty not in s:
+              raise SystemExit('qty target not found')
+          s = s.replace(old_qty, new_qty, 1)
+
+          old_refresh = """function refreshCount(){
+  const n=Object.values(qty).reduce((s,x)=>s+x.n,0);
+  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点';
+}"""
+          new_refresh = """function refreshCount(){
+  const values=Object.values(qty);
+  const n=values.reduce((s,x)=>s+x.n,0);
+  const total=values.reduce((s,x)=>s+(x.price==null?0:x.price*x.n),0);
+  const hasMarketPrice=values.some(x=>x.n>0 && x.price==null);
+  const totalText='¥'+total.toLocaleString()+(hasMarketPrice?' ＋ 時価':'')+'（税込）';
+  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点　合計金額：<b>'+totalText+'</b>';
+}"""
+          if old_refresh not in s:
+              raise SystemExit('refreshCount target not found')
+          s = s.replace(old_refresh, new_refresh, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Verify source change
+        run: |
+          grep -q "price:p" index.html
+          grep -q "合計金額" index.html
+          grep -q "hasMarketPrice" index.html
+
+      - name: Commit source update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m '注文数量に応じた合計金額表示を追加'
+          git push
+
+      - name: Prepare public files
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy updated files to XServer
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            echo "FTP deploy attempt ${attempt}/3"
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+              set ftp:ssl-allow no;
+              set ftp:passive-mode true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              mirror -R --verbose --parallel=2 deploy/ ./;
+              bye
+            "; then
+              echo "FTP deploy succeeded"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          exit 1
