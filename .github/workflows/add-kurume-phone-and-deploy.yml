@@ -1,0 +1,85 @@
+name: Add Kurume phone and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-kurume-phone-and-deploy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add Kurume phone to confirmation email
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('submit.php')
+          s=p.read_text(encoding='utf-8')
+          old='haruta bakery 八女店　TEL 0943-24-8001\\n'
+          new='haruta bakery 久留米店　TEL 0942-27-5959\\nharuta bakery 八女店　TEL 0943-24-8001\\n'
+          if new not in s:
+              if old not in s:
+                  raise SystemExit('target phone line not found')
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          grep -q 'haruta bakery 久留米店　TEL 0942-27-5959' submit.php
+          grep -q 'haruta bakery 八女店　TEL 0943-24-8001' submit.php
+
+      - name: Commit source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add submit.php
+          if ! git diff --cached --quiet; then
+            git commit -m '自動確認メールに久留米店の電話番号を追加'
+            git push
+          fi
+
+      - name: Prepare public files
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y lftp >/dev/null
+
+      - name: Deploy to XServer
+        timeout-minutes: 7
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            echo "FTP deploy attempt ${attempt}/3"
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+              set ftp:ssl-allow no;
+              set ftp:passive-mode true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 20;
+              mirror -R --verbose --parallel=2 deploy/ ./;
+              bye
+            "; then
+              echo 'FTP deploy succeeded'
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          exit 1
