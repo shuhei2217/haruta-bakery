@@ -28,16 +28,6 @@ jobs:
           mkdir -p deploy
           cp index.html submit.php deploy/
           cp -R images deploy/images
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('deploy/index.html')
-          s = p.read_text(encoding='utf-8')
-          target = '<p class="sub">関西でパンを学んだ湯川シェフが、2019年にくるめ緑花センターの一角ではじめた店。約400のレパートリーから、その日焼けた70種ほどが店先に並びます。並ぶパンはその日次第。企業・団体さまの外注注文にも対応しています。</p>'
-          if target not in s:
-              raise SystemExit('Target hero text not found')
-          s = s.replace(target, '', 1)
-          p.write_text(s, encoding='utf-8')
-          PY
 
       - name: Install lftp
         run: |
