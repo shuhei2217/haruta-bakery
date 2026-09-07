@@ -1,0 +1,74 @@
+name: Publish final order total and Instagram
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-final-order-instagram.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply both changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("const id='i'+(idc++); qty[id]={name:n,n:0};", "const id='i'+(idc++); qty[id]={name:n,n:0,price:p};", 1)
+          old="""function refreshCount(){
+  const n=Object.values(qty).reduce((s,x)=>s+x.n,0);
+  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点';
+}"""
+          new="""function refreshCount(){
+  const values=Object.values(qty);
+  const n=values.reduce((s,x)=>s+x.n,0);
+  const total=values.reduce((s,x)=>s+(x.price==null?0:x.price*x.n),0);
+  const hasMarketPrice=values.some(x=>x.n>0 && x.price==null);
+  const totalText='¥'+total.toLocaleString()+(hasMarketPrice?' ＋ 時価':'')+'（税込）';
+  selectedEl.innerHTML='選択中：<b>'+n+'</b> 点　｜　合計金額：<b>'+totalText+'</b>';
+}"""
+          if old in s:
+              s=s.replace(old,new,1)
+          s=s.replace('https://www.instagram.com/harutabakery2026/','https://www.instagram.com/harutabakery/')
+          s=s.replace('Instagram（@harutabakery2026）','Instagram（@harutabakery）')
+          p.write_text(s,encoding='utf-8')
+          PY
+          grep -q "合計金額" index.html
+          grep -q "price:p" index.html
+          test "$(grep -o 'https://www.instagram.com/harutabakery/' index.html | wc -l)" -ge 2
+      - name: Commit source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m '合計金額とInstagramリンクを本体へ反映'
+            git push
+          fi
+      - name: Deploy to XServer
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y lftp >/dev/null
+          rm -rf deploy && mkdir deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
+          for attempt in 1 2 3; do
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "set ftp:ssl-allow no; set ftp:passive-mode true; set net:timeout 20; set net:max-retries 2; mirror -R --verbose --parallel=2 deploy/ ./; bye"; then
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          exit 1
