@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Public build transform: keep order total and Instagram links applied on every deploy.
 p = Path('deploy/index.html')
 s = p.read_text(encoding='utf-8')
 
