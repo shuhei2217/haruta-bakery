@@ -1,0 +1,55 @@
+name: Update Instagram links and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-instagram-links.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update Instagram links
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          old='https://www.instagram.com/harutabakery2026/'
+          new='https://www.instagram.com/harutabakery/'
+          count=s.count(old)
+          if count < 2:
+              raise SystemExit(f'expected at least 2 Instagram links, found {count}')
+          s=s.replace(old,new)
+          s=s.replace('Instagram（@harutabakery2026）','Instagram（@harutabakery）')
+          p.write_text(s,encoding='utf-8')
+          PY
+          test "$(grep -o 'https://www.instagram.com/harutabakery/' index.html | wc -l)" -ge 2
+          ! grep -q 'harutabakery2026' index.html
+      - name: Commit source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Instagramリンクをharutabakeryへ変更'
+          git push
+      - name: Deploy exact updated source to XServer
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y lftp >/dev/null
+          rm -rf deploy && mkdir deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "set ftp:ssl-allow no; set ftp:passive-mode true; set net:timeout 20; mirror -R --verbose --parallel=2 deploy/ ./; bye"
