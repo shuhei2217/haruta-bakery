@@ -1,4 +1,4 @@
-name: Integrate Website Changes
+name: Deploy to XServer
 
 on:
   push:
@@ -7,111 +7,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: xserver-deploy-main
   cancel-in-progress: true
 
 jobs:
-  integrate-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Integrate requested changes into index.html
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-
-          s = re.sub(r'<title>.*?</title>', '<title>haruta bakery</title>', s, count=1, flags=re.S)
-          s = re.sub(r'<meta property="og:title" content="[^"]*">', '<meta property="og:title" content="haruta bakery">', s, count=1)
-          s = s.replace('<span class="en">haruta bakery — Kurume &amp; Yame</span>', '<span class="en">haruta bakery<br>— Kurume &amp; Yame —</span>')
-          s = re.sub(r'\s*<p class="meta">久留米店.*?</p>', '', s, count=1, flags=re.S)
-
-          s = re.sub(r'\s*<div class="demo-bar">.*?</div>', '', s, count=1, flags=re.S)
-          s = re.sub(r'\s*<div class="notice" id="notice">.*?</div>\s*</div>', '', s, count=1, flags=re.S)
-          s = re.sub(r'\s*<p style="font-size:\.8rem;color:var\(--taupe\);margin-top:1em">※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。.*?</p>', '', s, count=1, flags=re.S)
-          s = s.replace('<p class="note">店舗提供の「外注メニュー表」「注文書（八女店）」の品目・税込価格をもとにしています（要確認）。</p>', '')
-          s = s.replace('<p class="note">住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。</p>', '')
-          s = s.replace('フォームの項目は店舗の注文書にならっています。', '')
-
-          s = s.replace('<b>売り切れ次第閉店</b>', '売り切れ次第閉店')
-          s = s.replace('BLTEサンド', 'BLTサンド')
-          s = s.replace('9:30〜17:00 ／ 売り切れ次第閉店', '9:30〜16:00 ／ 売り切れ次第閉店')
-          s = s.replace('["抹茶のダマンドクロワッサン",350],', '')
-
-          for x in ['※要確認','（時間は要確認）','（要確認）','(時間は要確認)','(要確認)','・要確認']:
-              s = s.replace(x, '')
-          s = s.replace('時価・要確認', '時価')
-
-          if '駐車場あり／店内イートイン可能' not in s:
-              m = re.search(r'(<h3>八女店</h3>.*?<table>)(.*?)(</table>)', s, flags=re.S)
-              if m:
-                  body = m.group(2) + '\n          <tr><th>設備</th><td>駐車場あり／店内イートイン可能</td></tr>\n        '
-                  s = s[:m.start()] + m.group(1) + body + m.group(3) + s[m.end():]
-
-          kurume_map = '<div class="store-map" style="margin-top:16px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="久留米店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E4%B9%85%E7%95%99%E7%B1%B3%E5%B8%82%E5%96%84%E9%81%93%E5%AF%BA%E7%94%BA%E6%9C%A8%E5%A1%9A302-1&output=embed" width="100%" height="320" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>'
-          yame_map = '<div class="store-map" style="margin-top:16px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="八女店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E5%85%AB%E5%A5%B3%E5%B8%82%E6%9C%AC%E6%9D%918&output=embed" width="100%" height="320" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>'
-          placeholder = '<div class="map-ph">地図を埋め込み（実制作時に設定）</div>'
-          if placeholder in s:
-              s = s.replace(placeholder, kurume_map, 1)
-          if placeholder in s:
-              s = s.replace(placeholder, yame_map, 1)
-
-          s = re.sub(r'<p class="copy">.*?</p>', '<p class="copy">© haruta bakery</p>', s, count=1, flags=re.S)
-          s = re.sub(r'\s*<p class="disc">.*?</p>', '', s, count=1, flags=re.S)
-          s = re.sub(r"document\.getElementById\('noticeClose'\)\.addEventListener\('click',.*?\);\s*", '', s, count=1)
-
-          required = [
-              '<title>haruta bakery</title>',
-              'haruta bakery<br>— Kurume &amp; Yame —',
-              '9:30〜16:00 ／ 売り切れ次第閉店',
-              '駐車場あり／店内イートイン可能',
-              'BLTサンド',
-              '久留米店 Googleマップ',
-              '八女店 Googleマップ',
-              '<p class="copy">© haruta bakery</p>',
-          ]
-          forbidden = [
-              '制作デモ（非公式）',
-              'この欄はデモ用のダミー文です。',
-              '※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。',
-              '住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。',
-              '抹茶のダマンドクロワッサン',
-              'BLTEサンド',
-              '要確認',
-              '地図を埋め込み（実制作時に設定）',
-              "document.getElementById('noticeClose').addEventListener",
-          ]
-          missing = [x for x in required if x not in s]
-          stale = [x for x in forbidden if x in s]
-          if missing or stale:
-              raise SystemExit(f'Integration verification failed. missing={missing}, stale={stale}')
-
-          p.write_text(s, encoding='utf-8')
-          PY
-
-      - name: Commit integrated index.html
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-          else
-            git commit -m "公開用変更をindex.html本体へ統合"
-            git push origin HEAD:main
-          fi
 
       - name: Prepare public files
         run: |
@@ -125,7 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Deploy integrated public files to XServer
+      - name: Deploy public files to XServer
         timeout-minutes: 7
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
