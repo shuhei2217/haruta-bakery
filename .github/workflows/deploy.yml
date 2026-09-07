@@ -38,11 +38,7 @@ jobs:
           s = s.replace('※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。店の投稿・記事の文章を転載したものではなく、最終的な表現は店主の確認が必要です。', '')
           s = s.replace('店舗提供の「外注メニュー表」「注文書（八女店）」の品目・税込価格をもとにしています（要確認）。', '')
           s = s.replace('住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。', '')
-          s = s.replace('※要確認', '')
-          s = s.replace('（時間は要確認）', '')
-          s = s.replace('（要確認）', '')
-          s = s.replace('(時間は要確認)', '')
-          s = s.replace('(要確認)', '')
+          s = s.replace('※要確認', '').replace('（時間は要確認）', '').replace('（要確認）', '').replace('(時間は要確認)', '').replace('(要確認)', '')
           s = s.replace('BLTEサンド', 'BLTサンド')
           s = s.replace('9:30〜17:00 ／ 売り切れ次第閉店', '9:30〜16:00 ／ 売り切れ次第閉店')
           s = s.replace('9:30〜17:00 ／ <b>売り切れ次第閉店</b>', '9:30〜16:00 ／ <b>売り切れ次第閉店</b>')
@@ -56,46 +52,49 @@ jobs:
           s = re.sub(r'<[^>]*>\s*本ページは制作会社が作成した(?:<[^>]+>)*\**非公式の制作デモ\**.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。\s*</[^>]+>', '', s, flags=re.S)
           s = re.sub(r'本ページは制作会社が作成した.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。', '', s, flags=re.S)
 
-          bar_texts = [
+          for text in [
               '制作デモ（非公式）：写真はイメージ、価格・営業時間・メニューは店舗提供資料や公開情報に基づく参考値で、店舗に未確認の項目を含みます。',
               'お知らせ：企業・団体さまの外注注文、まとまった数量のご注文も承ります（【2日前】までにご相談ください）。この欄はデモ用のダミー文です。'
-          ]
-          for text in bar_texts:
+          ]:
               pos = s.find(text)
               if pos != -1:
                   start = s.rfind('<div', 0, pos)
                   end = s.find('</div>', pos)
-                  if start != -1 and end != -1:
-                      s = s[:start] + s[end + len('</div>'):]
-                  else:
-                      s = s.replace(text, '')
+                  s = s[:start] + s[end + 6:] if start != -1 and end != -1 else s.replace(text, '')
 
-          def add_map(html, store_name, map_url, marker):
-              if marker in html:
-                  return html
-              pattern = rf'(<h3>{re.escape(store_name)}</h3>\s*<table>.*?</table>)'
-              iframe = (
-                  f'\n<div class="store-map" style="margin-top:18px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);">'
-                  f'<iframe title="{store_name} Googleマップ" src="{map_url}" width="100%" height="320" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>'
-                  f'</div><!-- {marker} -->'
-              )
-              return re.sub(pattern, lambda m: m.group(1) + iframe, html, count=1, flags=re.S)
+          # Maps are injected as a standalone section before </main> (or </body> fallback),
+          # so this does not depend on store-card headings/tables/classes.
+          map_marker = 'haruta-google-maps-v2'
+          if map_marker not in s:
+              maps = '''
+          <section id="access-maps" aria-label="店舗アクセス" style="max-width:1100px;margin:48px auto;padding:0 20px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
+              <div><h3 style="margin:0 0 12px;">久留米店 Googleマップ</h3><div style="border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="久留米店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E4%B9%85%E7%95%99%E7%B1%B3%E5%B8%82%E5%96%84%E9%81%93%E5%AF%BA%E7%94%BA%E6%9C%A8%E5%A1%9A302-1&output=embed" width="100%" height="340" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div></div>
+              <div><h3 style="margin:0 0 12px;">八女店 Googleマップ</h3><div style="border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="八女店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E5%85%AB%E5%A5%B3%E5%B8%82%E6%9C%AC%E6%9D%918&output=embed" width="100%" height="340" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div></div>
+            </div>
+          </section><!-- haruta-google-maps-v2 -->
+          '''
+              if '</main>' in s:
+                  s = s.replace('</main>', maps + '\n</main>', 1)
+              elif '</body>' in s:
+                  s = s.replace('</body>', maps + '\n</body>', 1)
+              else:
+                  s += maps
 
-          s = add_map(
-              s,
-              '久留米店',
-              'https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E4%B9%85%E7%95%99%E7%B1%B3%E5%B8%82%E5%96%84%E9%81%93%E5%AF%BA%E7%94%BA%E6%9C%A8%E5%A1%9A302-1&output=embed',
-              'kurume-google-map'
-          )
-          s = add_map(
-              s,
-              '八女店',
-              'https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E5%85%AB%E5%A5%B3%E5%B8%82%E6%9C%AC%E6%9D%918&output=embed',
-              'yame-google-map'
-          )
+          # Fail deployment instead of silently succeeding if map injection ever breaks.
+          required = ['haruta-google-maps-v2', '久留米店 Googleマップ', '八女店 Googleマップ', 'google.com/maps?q=']
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit('Google map injection failed: ' + ', '.join(missing))
 
           p.write_text(s, encoding='utf-8')
           PY
+
+      - name: Verify generated maps
+        run: |
+          grep -q 'haruta-google-maps-v2' index.html
+          grep -q '久留米店 Googleマップ' index.html
+          grep -q '八女店 Googleマップ' index.html
 
       - name: Install lftp
         run: |
@@ -127,9 +126,7 @@ jobs:
             fi
             rc=$?
             echo "FTP deploy attempt ${attempt} failed or timed out (exit ${rc})"
-            if [ "$attempt" -lt 3 ]; then
-              sleep $((attempt * 10))
-            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
           done
           echo "FTP deploy failed after 3 attempts"
           exit 1
