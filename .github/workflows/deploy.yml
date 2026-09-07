@@ -27,6 +27,7 @@ jobs:
           s = s.replace('<b>売り切れ次第閉店</b>', '売り切れ次第閉店')
           s = s.replace('<title>haruta bakery｜久留米・八女／毎日70種の焼きたてパン【制作デモ】</title>', '<title>haruta bakery</title>')
           s = s.replace('<meta property="og:title" content="haruta bakery（制作デモ）">', '<meta property="og:title" content="haruta bakery">')
+          s = s.replace('<span class="en">haruta bakery — Kurume &amp; Yame</span>', '<span class="en">haruta bakery<br>— Kurume &amp; Yame —</span>')
           p.write_text(s, encoding='utf-8')
           PY
 
