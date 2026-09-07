@@ -17,6 +17,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply display fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('フォームの項目は店舗の注文書にならっています。', '')
+          s = s.replace('<b>売り切れ次第閉店</b>', '売り切れ次第閉店')
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Install lftp
         run: |
           sudo apt-get update
