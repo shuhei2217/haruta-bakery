@@ -1,0 +1,53 @@
+name: Apply header and hero cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-header-hero-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update index source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old_logo = '<span class="brand-logo" role="img" aria-label="haruta bakery"></span>'
+          new_logo = '<span class="brand-text">haruta bakery</span>'
+          old_text = '<p class="sub">関西でパンを学んだ湯川シェフが、2019年にくるめ緑花センターの一角ではじめた店。約400のレパートリーから、その日焼けた70種ほどが店先に並びます。並ぶパンはその日次第。企業・団体さまの外注注文にも対応しています。</p>'
+          old_btn = '<a href="#menu" class="btn">パンの紹介を見る</a>'
+          if old_logo not in s:
+              raise SystemExit('header logo target not found')
+          if old_text not in s:
+              raise SystemExit('hero text target not found')
+          if old_btn not in s:
+              raise SystemExit('hero button target not found')
+          s = s.replace(old_logo, new_logo, 1)
+          s = s.replace(old_text, '', 1)
+          s = s.replace(old_btn, '', 1)
+          style = '''\n<style>\n.brand-text{font-family:"Zen Old Mincho",serif;font-size:1.35rem;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--ink);white-space:nowrap}\n</style>\n'''
+          s = s.replace('</head>', style + '</head>', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify changes
+        run: |
+          grep -q '<span class="brand-text">haruta bakery</span>' index.html
+          ! grep -q 'パンの紹介を見る' index.html
+          ! grep -q '企業・団体さまの外注注文にも対応しています' index.html
+      - name: Commit source update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m '上部ロゴを小文字化しヒーロー文章とボタンを削除'
+          git push
