@@ -1,4 +1,117 @@
-name: Deploy to XServer
+name: Migrate and Deploy to XServer
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: xserver-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Integrate all requested website changes into index.html
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Public-facing titles and hero
+          s = re.sub(r'<title>.*?</title>', '<title>haruta bakery</title>', s, count=1, flags=re.S)
+          s = re.sub(r'<meta property="og:title" content="[^"]*">', '<meta property="og:title" content="haruta bakery">', s, count=1)
+          s = s.replace('<span class="en">haruta bakery — Kurume &amp; Yame</span>', '<span class="en">haruta bakery<br>— Kurume &amp; Yame —</span>')
+          s = re.sub(r'\s*<p class="meta">久留米店.*?</p>', '', s, count=1, flags=re.S)
+
+          # Remove demo / confirmation notes requested for deletion
+          s = re.sub(r'\s*<div class="demo-bar">.*?</div>', '', s, count=1, flags=re.S)
+          s = re.sub(r'\s*<div class="notice" id="notice">.*?</div>\s*</div>', '', s, count=1, flags=re.S)
+          s = re.sub(r'\s*<p style="font-size:\.8rem;color:var\(--taupe\);margin-top:1em">※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。.*?</p>', '', s, count=1, flags=re.S)
+          s = s.replace('<p class="note">店舗提供の「外注メニュー表」「注文書（八女店）」の品目・税込価格をもとにしています（要確認）。</p>', '')
+          s = s.replace('<p class="note">住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。</p>', '')
+          s = s.replace('フォームの項目は店舗の注文書にならっています。', '')
+
+          # Store/menu corrections
+          s = s.replace('<b>売り切れ次第閉店</b>', '売り切れ次第閉店')
+          s = s.replace('BLTEサンド', 'BLTサンド')
+          s = s.replace('9:30〜17:00 ／ 売り切れ次第閉店', '9:30〜16:00 ／ 売り切れ次第閉店')
+          s = s.replace('["抹茶のダマンドクロワッサン",350],', '')
+
+          # Remove all remaining “要確認” annotations, including JS-generated labels
+          for x in ['※要確認','（時間は要確認）','（要確認）','(時間は要確認)','(要確認)','・要確認']:
+              s = s.replace(x, '')
+          s = s.replace('時価・要確認', '時価')
+
+          # Yame facilities row, inserted once before the closing table tag of the Yame shop.
+          if '駐車場あり／店内イートイン可能' not in s:
+              m = re.search(r'(<h3>八女店</h3>.*?<table>)(.*?)(</table>)', s, flags=re.S)
+              if m:
+                  body = m.group(2) + '\n          <tr><th>設備</th><td>駐車場あり／店内イートイン可能</td></tr>\n        '
+                  s = s[:m.start()] + m.group(1) + body + m.group(3) + s[m.end():]
+
+          # Replace the two existing map placeholders directly. This no longer depends on heading/table structure.
+          kurume_map = '''<div class="store-map" style="margin-top:16px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="久留米店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E4%B9%85%E7%95%99%E7%B1%B3%E5%B8%82%E5%96%84%E9%81%93%E5%AF%BA%E7%94%BA%E6%9C%A8%E5%A1%9A302-1&output=embed" width="100%" height="320" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>'''
+          yame_map = '''<div class="store-map" style="margin-top:16px;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="八女店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E5%85%AB%E5%A5%B3%E5%B8%82%E6%9C%AC%E6%9D%918&output=embed" width="100%" height="320" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>'''
+          placeholder = '<div class="map-ph">地図を埋め込み（実制作時に設定）</div>'
+          if placeholder in s:
+              s = s.replace(placeholder, kurume_map, 1)
+          if placeholder in s:
+              s = s.replace(placeholder, yame_map, 1)
+
+          # Clean footer while keeping a normal copyright line.
+          s = re.sub(r'<p class="copy">.*?</p>', '<p class="copy">© haruta bakery</p>', s, count=1, flags=re.S)
+          s = re.sub(r'\s*<p class="disc">.*?</p>', '', s, count=1, flags=re.S)
+
+          # Removed notice DOM must not leave a null addEventListener that breaks all following JavaScript.
+          s = re.sub(r"document\.getElementById\('noticeClose'\)\.addEventListener\('click',.*?\);\s*", '', s, count=1)
+
+          # Verification: fail loudly if any requested change was not integrated.
+          required = [
+              '<title>haruta bakery</title>',
+              'haruta bakery<br>— Kurume &amp; Yame —',
+              '9:30〜16:00 ／ 売り切れ次第閉店',
+              '駐車場あり／店内イートイン可能',
+              'BLTサンド',
+              '久留米店 Googleマップ',
+              '八女店 Googleマップ',
+              '<p class="copy">© haruta bakery</p>',
+          ]
+          forbidden = [
+              '制作デモ（非公式）',
+              'この欄はデモ用のダミー文です。',
+              '※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。',
+              '住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。',
+              '抹茶のダマンドクロワッサン',
+              'BLTEサンド',
+              '要確認',
+              '地図を埋め込み（実制作時に設定）',
+              "document.getElementById('noticeClose').addEventListener",
+          ]
+          missing = [x for x in required if x not in s]
+          stale = [x for x in forbidden if x in s]
+          if missing or stale:
+              raise SystemExit(f'Integration verification failed. missing={missing}, stale={stale}')
+
+          p.write_text(s, encoding='utf-8')
+
+          # Replace this one-time migration workflow with a simple deployment-only workflow.
+          simple = '''name: Deploy to XServer
 
 on:
   push:
@@ -16,92 +129,25 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Apply display fixes
+      - name: Prepare public files
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          s = s.replace('フォームの項目は店舗の注文書にならっています。', '')
-          s = s.replace('<b>売り切れ次第閉店</b>', '売り切れ次第閉店')
-          s = s.replace('<title>haruta bakery｜久留米・八女／毎日70種の焼きたてパン【制作デモ】</title>', '<title>haruta bakery</title>')
-          s = s.replace('<meta property="og:title" content="haruta bakery（制作デモ）">', '<meta property="og:title" content="haruta bakery">')
-          s = s.replace('<span class="en">haruta bakery — Kurume &amp; Yame</span>', '<span class="en">haruta bakery<br>— Kurume &amp; Yame —</span>')
-          s = s.replace('<p class="meta">久留米店 9:30–17:00／水・土休　|　八女店 9:00–16:00／水・土休　|　売り切れ次第閉店　|　お支払いは現金のみ（営業時間は要確認）</p>', '')
-          s = s.replace('※この本文は新聞・地域情報サイトなどの公開情報をもとに制作側が書き起こした下書きです。店の投稿・記事の文章を転載したものではなく、最終的な表現は店主の確認が必要です。', '')
-          s = s.replace('店舗提供の「外注メニュー表」「注文書（八女店）」の品目・税込価格をもとにしています（要確認）。', '')
-          s = s.replace('住所・電話・時間は店舗提供資料と公開情報の参考値です。掲載前に必ず店主へ確認します。', '')
-          s = s.replace('※要確認', '').replace('（時間は要確認）', '').replace('（要確認）', '').replace('(時間は要確認)', '').replace('(要確認)', '')
-          s = s.replace('BLTEサンド', 'BLTサンド')
-          s = s.replace('9:30〜17:00 ／ 売り切れ次第閉店', '9:30〜16:00 ／ 売り切れ次第閉店')
-          s = s.replace('9:30〜17:00 ／ <b>売り切れ次第閉店</b>', '9:30〜16:00 ／ <b>売り切れ次第閉店</b>')
-          yame_pattern = r'(<h3>八女店</h3>\s*<table>.*?<tr><th>営業</th><td>.*?</td></tr>)'
-          if '駐車場あり／店内イートイン可能' not in s:
-              s = re.sub(yame_pattern, r'\1\n    <tr><th>設備</th><td>駐車場あり／店内イートイン可能</td></tr>', s, count=1, flags=re.S)
-          s = re.sub(r'<[^>]+>\s*抹茶のダマンドクロワッサン\s*</[^>]+>\s*<[^>]+>\s*[¥￥]?\s*350\s*円?\s*</[^>]+>', '', s)
-          s = re.sub(r'<option([^>]*)>\s*抹茶のダマンドクロワッサン(?:\s*[（(]?[¥￥]?350円?[）)]?)?\s*</option>', '', s)
-          s = re.sub(r'<[^>]+>[^<]*抹茶のダマンドクロワッサン[^<]*[¥￥]\s*350[^<]*</[^>]+>', '', s)
-          s = re.sub(r'<[^>]*>\s*©\s*haruta bakery（制作デモ）.*?</[^>]+>', '', s, flags=re.S)
-          s = re.sub(r'<[^>]*>\s*本ページは制作会社が作成した(?:<[^>]+>)*\**非公式の制作デモ\**.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。\s*</[^>]+>', '', s, flags=re.S)
-          s = re.sub(r'本ページは制作会社が作成した.*?Instagram リンクは店舗の公開アカウント（@harutabakery2026）への外部リンクです。', '', s, flags=re.S)
-
-          for text in [
-              '制作デモ（非公式）：写真はイメージ、価格・営業時間・メニューは店舗提供資料や公開情報に基づく参考値で、店舗に未確認の項目を含みます。',
-              'お知らせ：企業・団体さまの外注注文、まとまった数量のご注文も承ります（【2日前】までにご相談ください）。この欄はデモ用のダミー文です。'
-          ]:
-              pos = s.find(text)
-              if pos != -1:
-                  start = s.rfind('<div', 0, pos)
-                  end = s.find('</div>', pos)
-                  s = s[:start] + s[end + 6:] if start != -1 and end != -1 else s.replace(text, '')
-
-          # Maps are injected as a standalone section before </main> (or </body> fallback),
-          # so this does not depend on store-card headings/tables/classes.
-          map_marker = 'haruta-google-maps-v2'
-          if map_marker not in s:
-              maps = '''
-          <section id="access-maps" aria-label="店舗アクセス" style="max-width:1100px;margin:48px auto;padding:0 20px;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
-              <div><h3 style="margin:0 0 12px;">久留米店 Googleマップ</h3><div style="border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="久留米店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E4%B9%85%E7%95%99%E7%B1%B3%E5%B8%82%E5%96%84%E9%81%93%E5%AF%BA%E7%94%BA%E6%9C%A8%E5%A1%9A302-1&output=embed" width="100%" height="340" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div></div>
-              <div><h3 style="margin:0 0 12px;">八女店 Googleマップ</h3><div style="border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08);"><iframe title="八女店 Googleマップ" src="https://www.google.com/maps?q=%E7%A6%8F%E5%B2%A1%E7%9C%8C%E5%85%AB%E5%A5%B3%E5%B8%82%E6%9C%AC%E6%9D%918&output=embed" width="100%" height="340" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div></div>
-            </div>
-          </section><!-- haruta-google-maps-v2 -->
-          '''
-              if '</main>' in s:
-                  s = s.replace('</main>', maps + '\n</main>', 1)
-              elif '</body>' in s:
-                  s = s.replace('</body>', maps + '\n</body>', 1)
-              else:
-                  s += maps
-
-          # Fail deployment instead of silently succeeding if map injection ever breaks.
-          required = ['haruta-google-maps-v2', '久留米店 Googleマップ', '八女店 Googleマップ', 'google.com/maps?q=']
-          missing = [x for x in required if x not in s]
-          if missing:
-              raise SystemExit('Google map injection failed: ' + ', '.join(missing))
-
-          p.write_text(s, encoding='utf-8')
-          PY
-
-      - name: Verify generated maps
-        run: |
-          grep -q 'haruta-google-maps-v2' index.html
-          grep -q '久留米店 Googleマップ' index.html
-          grep -q '八女店 Googleマップ' index.html
+          rm -rf deploy
+          mkdir -p deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
 
       - name: Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Deploy website to XServer
+      - name: Deploy public files to XServer
         timeout-minutes: 7
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -118,7 +164,7 @@ jobs:
               set net:max-retries 2;
               set net:reconnect-interval-base 5;
               set net:reconnect-interval-max 20;
-              mirror -R --verbose --parallel=2 --exclude-glob .git* --exclude-glob .github/ --exclude-glob .claude/ --exclude-glob .rate/ --exclude README.txt --exclude config.sample.php ./ /ciao-st.com/public_html/harutabakery/site/;
+              mirror -R --verbose --parallel=2 deploy/ /ciao-st.com/public_html/harutabakery/site/;
               bye
             "; then
               echo "FTP deploy succeeded"
@@ -128,5 +174,59 @@ jobs:
             echo "FTP deploy attempt ${attempt} failed or timed out (exit ${rc})"
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
           done
-          echo "FTP deploy failed after 3 attempts"
+          exit 1
+'''
+          Path('.github/workflows/deploy.yml').write_text(simple, encoding='utf-8')
+          PY
+
+      - name: Commit integrated source and simplified deploy workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/deploy.yml
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "公開用変更をindex.html本体へ統合"
+            git push origin HEAD:main
+          fi
+
+      - name: Prepare public files
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          cp index.html submit.php deploy/
+          cp -R images deploy/images
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy integrated public files to XServer
+        timeout-minutes: 7
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            echo "FTP deploy attempt ${attempt}/3"
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+              set ftp:ssl-allow no;
+              set ftp:passive-mode true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 20;
+              mirror -R --verbose --parallel=2 deploy/ /ciao-st.com/public_html/harutabakery/site/;
+              bye
+            "; then
+              echo "FTP deploy succeeded"
+              exit 0
+            fi
+            rc=$?
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
           exit 1
