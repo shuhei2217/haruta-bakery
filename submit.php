@@ -3,16 +3,31 @@ declare(strict_types=1);
 /**
  * haruta bakery ご注文（事前注文・外注）フォーム 受信スクリプト
  * - config.php（gitignore対象）に LINE / メールの設定を入れて有効化します
- * - 未設定のうちは 500 server_not_configured を返し、画面は「お電話で」を案内します
  * - 店舗の注文書にならい、会社名/店舗名・住所・お届け方法・時間帯も受け取ります
  */
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
+if (function_exists('mb_language')) mb_language('uni');
+if (function_exists('mb_internal_encoding')) mb_internal_encoding('UTF-8');
+
 function out(int $code, array $body): void {
   http_response_code($code);
   echo json_encode($body, JSON_UNESCAPED_UNICODE);
   exit;
+}
+
+function sendUtf8Mail(string $to, string $subject, string $body, string $from, string $replyTo = ''): bool {
+  $headers = "MIME-Version: 1.0\r\n";
+  $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+  $headers .= "Content-Transfer-Encoding: 8bit\r\n";
+  if ($from !== '') $headers .= "From: haruta bakery <{$from}>\r\n";
+  if ($replyTo !== '') $headers .= "Reply-To: {$replyTo}\r\n";
+
+  if (function_exists('mb_send_mail')) {
+    return @mb_send_mail($to, $subject, $body, $headers);
+  }
+  return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -31,7 +46,7 @@ if (!$hasLine && !$hasMail) out(500, ['ok' => false, 'error' => 'server_not_conf
 /* ---------- ハニーポット ---------- */
 if (!empty($_POST['hp_url'])) out(200, ['ok' => true]);
 
-/* ---------- レート制限（同一IP・直近10分） ---------- */
+/* ---------- レート制限 ---------- */
 $ip    = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 $limit = (int)($cfg['rate_limit'] ?? 5);
 $rlDir = __DIR__ . '/.rate';
@@ -85,7 +100,6 @@ if (!is_array($items) || count($items) === 0 || count($items) > 200) {
     $lines[] = "・{$n} × {$q}";
   }
 }
-
 if ($err) out(422, ['ok' => false, 'error' => 'invalid', 'message' => '入力内容をご確認ください（' . implode('、', array_values(array_unique($err))) . '）']);
 
 /* ---------- 通知メッセージ ---------- */
@@ -104,6 +118,7 @@ $msg .= "(送信 " . date('Y-m-d H:i') . ")";
 
 @file_put_contents(__DIR__ . '/orders.log', json_encode(['at'=>date('c'),'ip'=>$ip,'shop'=>$shop,'method'=>$method,'company'=>$company,'addr'=>$addr,'date'=>$date,'time'=>$time,'name'=>$name,'email'=>$email,'tel'=>$tel,'items'=>$items,'note'=>$note], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 
+/* ---------- LINE通知 ---------- */
 $notified = false;
 if ($hasLine && function_exists('curl_init')) {
   $ch = curl_init('https://api.line.me/v2/bot/message/push');
@@ -114,26 +129,24 @@ if ($hasLine && function_exists('curl_init')) {
   if ($code >= 200 && $code < 300) $notified = true;
 }
 
+/* ---------- メール通知 ---------- */
 $shopName = (string)($cfg['shop_name'] ?? 'haruta bakery');
-$mailFrom = (string)($cfg['mail_from'] ?? ($hasMail ? $cfg['mail_to'] : ''));
+$mailFrom = trim((string)($cfg['mail_from'] ?? ''));
+if ($mailFrom === '') $mailFrom = 'no-reply@ciao-st.com';
+
 if ($hasMail) {
   $subject = '【ご注文】' . $shop . ' ' . $method . ' ' . $date . ' ' . $time . ' / ' . ($company !== '' ? $company . ' ' : '') . $name;
-  $headers = "Content-Type: text/plain; charset=UTF-8\r\n";
-  if ($email !== '') $headers .= "Reply-To: " . $email . "\r\n";
-  if (function_exists('mb_send_mail')) { if (@mb_send_mail($cfg['mail_to'], $subject, $msg, $headers)) $notified = true; }
-  elseif (@mail($cfg['mail_to'], $subject, $msg, $headers)) $notified = true;
+  if (sendUtf8Mail($cfg['mail_to'], $subject, $msg, $mailFrom, $email)) $notified = true;
 }
 
+/* ---------- 自動確認メール ---------- */
 $acked = false;
 if ($hasMail && $email !== '') {
   $cSubject = '【' . $shopName . '】ご注文を受け付けました（' . $date . ' ' . $time . '）';
   $cBody = "{$name} 様\n\nこのたびはご注文ありがとうございます。下記の内容で受け付けました。\nご注文は事前注文です。担当より折り返しご確認のご連絡をさせていただきます。\n※このメールは自動送信です。ご返信いただいても対応致しかねます。\n\n──────────\n取扱店舗: {$shop}\nお届け方法: {$method}\nお届け先: {$company}\nご住所: {$addr}\n希望日時: {$date} {$time}\nご担当者: {$name} 様\n電話: {$tel}\n──────────\n" . implode("\n", $lines) . "\n";
   if ($note !== '') $cBody .= "──────────\n備考: {$note}\n";
   $cBody .= "──────────\n\nお渡しまでに2日間いただきます（【2日前】までにご依頼ください）。\n配達可能日は Instagram（@harutabakery2026）でご確認ください。\n\nharuta bakery 八女店　TEL 0943-24-8001\n※本ページは制作デモです。実際のご注文の受付は行っておりません。\n";
-  $cHeaders = "Content-Type: text/plain; charset=UTF-8\r\n";
-  if ($mailFrom !== '') $cHeaders .= "From: {$shopName} <{$mailFrom}>\r\nReply-To: {$mailFrom}\r\n";
-  if (function_exists('mb_send_mail')) $acked = @mb_send_mail($email, $cSubject, $cBody, $cHeaders);
-  else $acked = @mail($email, $cSubject, $cBody, $cHeaders);
+  $acked = sendUtf8Mail($email, $cSubject, $cBody, $mailFrom, $mailFrom);
 }
 
 $res = ['ok' => true];
