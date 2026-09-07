@@ -29,6 +29,14 @@ jobs:
           cp index.html submit.php deploy/
           cp -R images deploy/images
 
+      - name: Verify public source
+        run: |
+          grep -q '<title>haruta bakery</title>' deploy/index.html
+          grep -q '久留米店 Googleマップ' deploy/index.html
+          grep -q '八女店 Googleマップ' deploy/index.html
+          ! grep -q '制作デモ（非公式）' deploy/index.html
+          ! grep -q 'この欄はデモ用のダミー文です' deploy/index.html
+
       - name: Install lftp
         run: |
           sudo apt-get update
@@ -51,7 +59,7 @@ jobs:
               set net:max-retries 2;
               set net:reconnect-interval-base 5;
               set net:reconnect-interval-max 20;
-              mirror -R --verbose --parallel=2 deploy/ /ciao-st.com/public_html/harutabakery/site/;
+              mirror -R --verbose --parallel=2 deploy/ ./;
               bye
             "; then
               echo "FTP deploy succeeded"
