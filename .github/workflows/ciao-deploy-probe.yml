@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo apt-get update >/dev/null
           sudo apt-get install -y lftp >/dev/null
-      - name: Inspect FTP working directories
+      - name: Inspect ciao-st.com directory
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -30,15 +30,15 @@ jobs:
             set ftp:ssl-allow no;
             set ftp:passive-mode true;
             set net:timeout 20;
-            echo '--- cwd ---';
+            echo '--- root ---';
             pwd;
             cls -1;
-            echo '--- parent ---';
-            cd ..;
+            echo '--- ciao-st.com ---';
+            cd ciao-st.com;
             pwd;
             cls -1;
-            echo '--- grandparent ---';
-            cd ..;
+            echo '--- ciao-st.com/public_html ---';
+            cd public_html;
             pwd;
             cls -1;
             bye
