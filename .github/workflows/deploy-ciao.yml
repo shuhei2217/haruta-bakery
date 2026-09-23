@@ -1,0 +1,65 @@
+name: Deploy ciao official site
+
+on:
+  push:
+    branches: [ciao-official-site]
+    paths:
+      - "index.html"
+      - ".github/workflows/deploy-ciao.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ciao-official-site-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout ciao branch
+        uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y lftp >/dev/null
+
+      - name: Deploy index.html to ciao-st.com
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          LOCAL_SHA="$(sha256sum index.html | awk '{print $1}')"
+          echo "Local SHA256: $LOCAL_SHA"
+
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+            set ftp:ssl-allow no;
+            set ftp:passive-mode true;
+            set net:timeout 20;
+            set net:max-retries 2;
+
+            cd ciao-st.com/public_html;
+
+            get index.html -o old-index.html;
+            put old-index.html -o index.backup-before-ciao-v11.html;
+
+            put index.html -o index.html;
+            get index.html -o deployed-index.html;
+            bye
+          "
+
+          REMOTE_SHA="$(sha256sum deployed-index.html | awk '{print $1}')"
+          echo "Remote SHA256: $REMOTE_SHA"
+
+          if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+            echo "SHA256 mismatch after deploy"
+            exit 1
+          fi
+
+          echo "ciao-st.com deployment verified"
