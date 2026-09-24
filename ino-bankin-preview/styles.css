@@ -949,3 +949,15 @@ img{max-width:100%;height:auto;display:block}
 @media(max-width:375px){
   .service-sticky .service-vertical-title{font-size:36px!important}
 }
+
+
+/* 2026-09-24 eliminate service-title flashing completely */
+.service-vertical-title,
+.service-vertical-copy{
+  transition:none!important;
+}
+.service-vertical-title.is-changing,
+.service-vertical-copy.is-changing{
+  opacity:1!important;
+  transform:none!important;
+}
