@@ -1,0 +1,112 @@
+name: Verify Vertical Service Sticky
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/verify-vertical-service-sticky.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+
+      - name: Verify live page
+        run: |
+          mkdir -p verify
+          node - <<'NODE'
+          const fs=require('fs');
+          const { chromium }=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const viewports=[
+              {name:'pc',w:1440,h:1000},
+              {name:'m375',w:375,h:812},
+              {name:'m390',w:390,h:844},
+              {name:'m430',w:430,h:900}
+            ];
+            const results=[];
+            for(const vp of viewports){
+              const page=await browser.newPage({viewport:{width:vp.w,height:vp.h},deviceScaleFactor:1});
+              const errors=[], bad=[];
+              page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+              page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
+              page.on('response',r=>{if(r.status()>=400) bad.push(r.status()+' '+r.url())});
+              await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2215-'+vp.w,{waitUntil:'domcontentloaded',timeout:30000});
+              await page.waitForTimeout(1800);
+              await page.evaluate(()=>{document.documentElement.style.scrollBehavior='auto'});
+
+              const base=await page.evaluate(()=>({
+                innerWidth,
+                scrollWidth:document.documentElement.scrollWidth,
+                stickyPosition:getComputedStyle(document.querySelector('.service-sticky')).position,
+                leftBasis:getComputedStyle(document.querySelector('.service-sticky')).flexBasis,
+                rightBasis:getComputedStyle(document.querySelector('.service-scroll')).flexBasis,
+                titleWritingMode:getComputedStyle(document.querySelector('.service-vertical-title')).writingMode,
+                titleText:document.querySelector('#serviceStickyTitle')?.textContent.trim(),
+                hasOldMedia:!!document.querySelector('.service-sticky-media'),
+                imgInsideSticky:document.querySelectorAll('.service-sticky img').length,
+                imageErrors:[...document.images].filter(i=>!i.complete||i.naturalWidth===0).map(i=>i.src)
+              }));
+
+              const story=await page.locator('.service-story').evaluate(el=>{
+                const r=el.getBoundingClientRect();
+                return {top:r.top+scrollY,height:r.height};
+              });
+              const stickyTop=await page.locator('.service-sticky').evaluate(el=>Math.round(parseFloat(getComputedStyle(el).top)||0));
+              const panels=await page.locator('.service-panel').count();
+              const samples=[];
+              for(let i=0;i<panels;i++){
+                const panel=page.locator('.service-panel').nth(i);
+                const pos=await panel.evaluate(el=>{const r=el.getBoundingClientRect();return r.top+scrollY+r.height*.45});
+                await page.evaluate(y=>scrollTo(0,y),Math.max(0,pos-vp.h*.35));
+                await page.waitForTimeout(380);
+                samples.push(await page.evaluate(()=>({
+                  title:document.querySelector('#serviceStickyTitle')?.textContent.trim(),
+                  top:Math.round(document.querySelector('.service-sticky').getBoundingClientRect().top)
+                })));
+              }
+
+              await page.evaluate(()=>scrollTo(0,0));
+              await page.waitForTimeout(120);
+              await page.screenshot({path:`verify/${vp.name}-full.png`,fullPage:true});
+
+              results.push({vp,base,stickyTop,samples,errors,bad});
+
+              if(base.scrollWidth!==vp.w) throw new Error(vp.name+' horizontal overflow '+base.scrollWidth);
+              if(base.hasOldMedia||base.imgInsideSticky!==0) throw new Error(vp.name+' sticky image still exists');
+              if(!['vertical-rl','tb-rl'].includes(base.titleWritingMode)) throw new Error(vp.name+' title not vertical '+base.titleWritingMode);
+              if(base.stickyPosition!=='sticky') throw new Error(vp.name+' sticky disabled');
+              if(base.imageErrors.length) throw new Error(vp.name+' image errors '+base.imageErrors.join(','));
+              if(errors.length) throw new Error(vp.name+' JS errors '+errors.join(' | '));
+              if(bad.length) throw new Error(vp.name+' HTTP errors '+bad.join(' | '));
+              const titles=samples.map(x=>x.title);
+              if(!titles.includes('建築板金')||!titles.includes('屋根')||!titles.includes('外壁')) throw new Error(vp.name+' title switching failed '+JSON.stringify(titles));
+              const stuck=samples.slice(1).some(x=>Math.abs(x.top-stickyTop)<=3);
+              if(!stuck) throw new Error(vp.name+' sticky did not hold '+JSON.stringify({stickyTop,samples}));
+              await page.close();
+            }
+            fs.writeFileSync('verify/diagnostic.json',JSON.stringify(results,null,2));
+            console.log(JSON.stringify(results,null,2));
+            await browser.close();
+          })();
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ino-vertical-service-sticky-check
+          path: verify/
+          retention-days: 1
