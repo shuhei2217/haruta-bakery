@@ -76,23 +76,25 @@ jobs:
               await faq.locator('summary').click();
               const faqOpen=await faq.evaluate(el=>el.open);
 
-              // sticky behavior check
-              const serviceBox=await page.locator('#services').boundingBox();
+              // sticky behavior check using document coordinates, independent of FAQ auto-scroll.
+              const storyMetrics=await page.locator('.service-story').evaluate(el=>{
+                const r=el.getBoundingClientRect();
+                return {top:r.top+window.scrollY,height:r.height};
+              });
               const stickyTopCss=await page.locator('.service-sticky').evaluate(el=>parseFloat(getComputedStyle(el).top)||0);
               const samples=[];
-              if(serviceBox){
-                const points=[
-                  serviceBox.y+Math.min(220,serviceBox.height*.18),
-                  serviceBox.y+Math.min(520,serviceBox.height*.42),
-                  serviceBox.y+Math.min(850,serviceBox.height*.67)
-                ];
-                for(const y of points){
-                  await page.evaluate(y=>window.scrollTo(0,y),y);
-                  await page.waitForTimeout(250);
-                  const r=await page.locator('.service-sticky').boundingBox();
-                  const active=await page.locator('.service-visual.is-active strong').textContent().catch(()=>null);
-                  samples.push({scrollY:y,top:r?Math.round(r.y):null,active});
-                }
+              const offsets=[
+                Math.min(160,storyMetrics.height*.15),
+                Math.min(480,storyMetrics.height*.42),
+                Math.min(760,storyMetrics.height*.66)
+              ];
+              for(const off of offsets){
+                const y=Math.max(0,storyMetrics.top+off);
+                await page.evaluate(y=>window.scrollTo(0,y),y);
+                await page.waitForTimeout(300);
+                const r=await page.locator('.service-sticky').boundingBox();
+                const active=await page.locator('.service-visual.is-active strong').textContent().catch(()=>null);
+                samples.push({scrollY:Math.round(y),top:r?Math.round(r.y):null,active});
               }
 
               await page.evaluate(()=>window.scrollTo(0,0));
