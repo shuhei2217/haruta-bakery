@@ -1,0 +1,43 @@
+name: Upload Approved Hero Reference
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/upload-approved-hero-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Download approved hero crop
+        env:
+          HERO_URL: 'https://sdmntprindiasocentral.oaiusercontent.com/files/00000000-9850-8211-8ec2-a07a76655869/raw?se=2026-09-24T05%3A23%3A02Z&sp=r&sv=2026-02-06&sr=b&scid=584573b1-0a55-5220-abd1-144bbec03d9e&skoid=0765b554-4b90-4fa2-9d6d-0055a2427910&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T02%3A23%3A19Z&ske=2026-09-25T02%3A23%3A19Z&sks=b&skv=2026-02-06&sig=3JhqKhxLVlyprkueMfuXXV40xNbjZWW1svKW43IYeBg%3D'
+        run: |
+          mkdir -p upload/images
+          curl -fL --retry 3 --max-time 60 "$HERO_URL" -o upload/images/hero-reference-mobile.jpg
+          test -s upload/images/hero-reference-mobile.jpg
+          file upload/images/hero-reference-mobile.jpg
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y lftp >/dev/null
+
+      - name: Upload image to XServer preview folder
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+            set ftp:ssl-allow no;
+            set ftp:passive-mode true;
+            mkdir -p ino-bankin-preview/images;
+            mirror -R --verbose upload/images/ ./ino-bankin-preview/images/;
+            bye
+          "
