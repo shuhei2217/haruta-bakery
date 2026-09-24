@@ -1,0 +1,77 @@
+name: Capture Ino Mobile Safely
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/capture-ino-mobile-safely.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Capture public mobile page
+        run: |
+          mkdir -p capture-safe
+          node - <<'NODE'
+          const fs=require('fs');
+          const { chromium }=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
+            const errors=[];
+            page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+            page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
+            let gotoError=null;
+            try{
+              await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?check=20260924-1435',{waitUntil:'domcontentloaded',timeout:30000});
+            }catch(e){gotoError=e.message}
+            await page.waitForTimeout(2500);
+            const info=await page.evaluate(()=> {
+              const hero=document.querySelector('.hero-mobile-reference');
+              const r=hero?.getBoundingClientRect();
+              return {
+                title:document.title,
+                innerWidth,
+                scrollWidth:document.documentElement.scrollWidth,
+                bodyScrollWidth:document.body.scrollWidth,
+                heroDisplay:hero?getComputedStyle(hero).display:null,
+                heroWidth:r?Math.round(r.width):0,
+                heroLeft:r?Math.round(r.left):0,
+                heroRight:r?Math.round(r.right):0,
+                heroNaturalWidth:hero?.naturalWidth||0,
+                heroNaturalHeight:hero?.naturalHeight||0,
+                heroComplete:hero?.complete||false,
+                cssHref:document.querySelector('link[rel="stylesheet"]')?.href||'',
+                scriptSrc:document.querySelector('script[src]')?.src||'',
+                areaHasOldMap:!!document.querySelector('.area-map'),
+                areaRegions:[...document.querySelectorAll('.area-regions span')].map(x=>x.textContent.trim())
+              };
+            });
+            fs.writeFileSync('capture-safe/diagnostic.json',JSON.stringify({gotoError,info,errors},null,2));
+            await page.screenshot({path:'capture-safe/top.png',fullPage:false});
+            const hero=page.locator('.hero');
+            if(await hero.count()) await hero.screenshot({path:'capture-safe/hero.png'});
+            const area=page.locator('#area');
+            if(await area.count()) await area.screenshot({path:'capture-safe/area.png'});
+            console.log(JSON.stringify({gotoError,info,errors},null,2));
+            await browser.close();
+          })();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ino-mobile-safe-capture
+          path: capture-safe/
+          retention-days: 1
