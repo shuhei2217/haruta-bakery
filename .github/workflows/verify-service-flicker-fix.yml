@@ -20,10 +20,11 @@ jobs:
 
       - name: Confirm live version
         run: |
-          curl -fsSL --max-time 25 'https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2342' -o /tmp/live.html
-          grep -q 'script.js?v=20260924-2342' /tmp/live.html
+          curl -fsSL --max-time 25 'https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2353' -o /tmp/live.html
+          grep -q 'script.js?v=20260924-2350' /tmp/live.html
+          grep -q 'styles.css?v=20260924-2353' /tmp/live.html
 
-      - name: Verify no repeated flicker
+      - name: Verify stable title switching
         run: |
           npm init -y >/dev/null 2>&1
           npm install playwright@1.55.0 >/dev/null 2>&1
@@ -33,41 +34,42 @@ jobs:
           (async()=>{
             const browser=await chromium.launch({headless:true});
             const page=await browser.newPage({viewport:{width:390,height:844}});
-            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2342',{waitUntil:'domcontentloaded',timeout:30000});
+            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2353',{waitUntil:'domcontentloaded',timeout:30000});
             await page.waitForSelector('#serviceStickyTitle',{timeout:20000});
+
+            const style=await page.evaluate(()=>{
+              const t=document.querySelector('#serviceStickyTitle');
+              const cs=getComputedStyle(t);
+              return {transition:cs.transitionDuration,opacity:cs.opacity,transform:cs.transform};
+            });
+            if(style.transition!=='0s') throw new Error('transition still active: '+style.transition);
+
             await page.evaluate(()=>{
-              window.__flicker={classAdds:0,textChanges:0};
+              window.__changes=0;
               const title=document.querySelector('#serviceStickyTitle');
-              const mo=new MutationObserver(muts=>{
+              new MutationObserver(muts=>{
                 for(const m of muts){
-                  if(m.type==='attributes' && m.attributeName==='class' && title.classList.contains('is-changing')) window.__flicker.classAdds++;
-                  if(m.type==='childList' || m.type==='characterData') window.__flicker.textChanges++;
+                  if(m.type==='childList' || m.type==='characterData') window.__changes++;
                 }
-              });
-              mo.observe(title,{attributes:true,childList:true,characterData:true,subtree:true});
-              window.__flickerObserver=mo;
+              }).observe(title,{childList:true,characterData:true,subtree:true});
             });
 
-            const panel0=page.locator('.service-panel').nth(0);
-            const box0=await panel0.boundingBox();
-            const baseY=await panel0.evaluate(el=>el.getBoundingClientRect().top+scrollY);
+            const firstY=await page.locator('.service-panel').nth(0).evaluate(el=>el.getBoundingClientRect().top+scrollY);
             for(const delta of [120,150,180,210,240,200,170,140,110]){
-              await page.evaluate(y=>scrollTo(0,y), Math.max(0,baseY+delta-300));
-              await page.waitForTimeout(120);
+              await page.evaluate(y=>scrollTo(0,y),Math.max(0,firstY+delta-300));
+              await page.waitForTimeout(100);
             }
+            const same=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),changes:window.__changes}));
+
+            const roofY=await page.locator('.service-panel').nth(1).evaluate(el=>el.getBoundingClientRect().top+scrollY+el.offsetHeight*.5);
+            await page.evaluate(y=>scrollTo(0,y-innerHeight*.42),roofY);
             await page.waitForTimeout(250);
-            const samePanel=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),...window.__flicker}));
+            const roof=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),changes:window.__changes}));
 
-            const panel1Y=await page.locator('.service-panel').nth(1).evaluate(el=>el.getBoundingClientRect().top+scrollY+el.offsetHeight*.45);
-            await page.evaluate(y=>scrollTo(0,y-innerHeight*.35),panel1Y);
-            await page.waitForTimeout(450);
-            const afterRoof=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),...window.__flicker}));
-
-            console.log(JSON.stringify({samePanel,afterRoof},null,2));
-            if(samePanel.title!=='建築板金') throw new Error('unexpected title in first panel');
-            if(samePanel.classAdds!==0 || samePanel.textChanges!==0) throw new Error('repeated flicker while staying in same panel');
-            if(afterRoof.title!=='屋根') throw new Error('title did not switch to roof');
-            if(afterRoof.classAdds>1) throw new Error('too many animation triggers on one service change: '+afterRoof.classAdds);
+            console.log(JSON.stringify({style,same,roof},null,2));
+            if(same.title!=='建築板金' || same.changes!==0) throw new Error('same-panel flicker detected');
+            if(roof.title!=='屋根') throw new Error('roof title did not activate');
+            if(roof.changes!==1) throw new Error('title changed more than once: '+roof.changes);
             await browser.close();
           })();
           NODE
