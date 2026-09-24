@@ -44,7 +44,18 @@ jobs:
               page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
               page.on('response',r=>{if(r.status()>=400) badResponses.push(r.status()+' '+r.url())});
               await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?verify=20260924-1728-'+vp.w,{waitUntil:'domcontentloaded',timeout:30000});
-              await page.waitForTimeout(2200);
+              await page.waitForTimeout(1200);
+
+              // Trigger every lazy-loaded image before image health checks.
+              const pageHeight=await page.evaluate(()=>document.documentElement.scrollHeight);
+              for(let y=0;y<pageHeight;y+=Math.max(450,Math.floor(vp.h*.7))){
+                await page.evaluate(y=>window.scrollTo(0,y),y);
+                await page.waitForTimeout(120);
+              }
+              await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+              await page.waitForTimeout(800);
+              await page.evaluate(()=>window.scrollTo(0,0));
+              await page.waitForTimeout(300);
 
               const base=await page.evaluate(()=>({
                 innerWidth,
