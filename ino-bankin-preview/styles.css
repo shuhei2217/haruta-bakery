@@ -929,3 +929,23 @@ img{max-width:100%;height:auto;display:block}
     font-size:10px!important;
   }
 }
+
+
+/* 2026-09-24 authoritative vertical service title sizing.
+   Higher specificity is intentional to beat older .service-sticky h3 !important rules. */
+.service-sticky .service-vertical-title{
+  font-size:clamp(48px,5vw,72px)!important;
+  line-height:1!important;
+}
+@media(max-width:960px){
+  .service-sticky .service-vertical-title{font-size:56px!important}
+}
+@media(max-width:640px){
+  .service-sticky .service-vertical-title{font-size:40px!important}
+}
+@media(max-width:390px){
+  .service-sticky .service-vertical-title{font-size:38px!important}
+}
+@media(max-width:375px){
+  .service-sticky .service-vertical-title{font-size:36px!important}
+}
