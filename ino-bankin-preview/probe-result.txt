@@ -1,0 +1,5 @@
+https://harutabakery.ciao-st.com/site/ino-bankin-preview/ | 200 https://harutabakery.ciao-st.com/site/ino-bankin-preview/ | marker=yes
+https://harutabakery.ciao-st.com/ino-bankin-preview/ | 404 https://harutabakery.ciao-st.com/ino-bankin-preview/ | marker=no
+https://ciao-st.com/harutabakery/site/ino-bankin-preview/ | 200 https://ciao-st.com/harutabakery/site/ino-bankin-preview/ | marker=yes
+https://ciao-st.com/harutabakery/ino-bankin-preview/ | 404 https://ciao-st.com/harutabakery/ino-bankin-preview/ | marker=no
+https://ciao-st.com/ino-bankin-preview/ | 404 https://ciao-st.com/ino-bankin-preview/ | marker=no
