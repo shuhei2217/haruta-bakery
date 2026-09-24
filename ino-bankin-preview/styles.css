@@ -160,3 +160,140 @@ img{max-width:100%;height:auto;display:block}
     z-index:3!important;
   }
 }
+
+/* ===== 2026-09-24 Ino improvement pass ===== */
+.svg-sprite{position:absolute!important;width:0!important;height:0!important;overflow:hidden!important;pointer-events:none}
+.icon-svg{width:1em;height:1em;display:block;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.service-story-section{overflow:visible!important;background:#fff}
+.service-story{display:flex;align-items:flex-start;gap:34px;margin-top:54px;min-width:0}
+.service-sticky{flex:0 0 36%;min-width:0;align-self:flex-start;position:sticky;top:calc(var(--header-h) + 24px)}
+.service-sticky-inner{background:linear-gradient(145deg,#071f3e,#0a3c70);color:#fff;padding:34px;min-height:560px;position:relative;overflow:hidden}
+.service-sticky-inner:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 20%,rgba(255,255,255,.09),transparent 38%);pointer-events:none}
+.service-kicker{margin:0 0 12px;font-size:11px;font-weight:800;letter-spacing:.14em;color:#cbd7e4}
+.service-sticky h3{font-size:clamp(28px,3vw,42px);line-height:1.35;margin:0 0 24px;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;position:relative;z-index:2}
+.service-sticky-media{position:relative;min-height:300px;margin:18px -34px 22px;background-image:linear-gradient(180deg,rgba(1,19,39,.15),rgba(1,19,39,.62)),url("images/metal-roof-detail.jpg?v=20260924-1728");background-size:cover;background-position:center;overflow:hidden}
+.visual-note{position:absolute;right:10px;bottom:8px;z-index:5;font-size:8px;letter-spacing:.08em;color:rgba(255,255,255,.76);text-shadow:0 1px 5px rgba(0,0,0,.5)}
+.service-visual{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:28px 34px;opacity:0;transform:translateY(8px);transition:opacity .25s ease,transform .25s ease;pointer-events:none}
+.service-visual.is-active{opacity:1;transform:none}
+.service-visual-icon{width:94px;height:94px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25));margin-bottom:10px}
+.service-visual strong{font-size:22px;letter-spacing:.04em}
+.service-sticky-note{margin:0;font-size:11px;line-height:1.8;color:#d5e0ea;position:relative;z-index:2}
+.service-scroll{flex:1 1 64%;min-width:0}
+.service-panel{position:relative;min-height:390px;padding:56px 50px 46px 74px;border-top:1px solid #ccd6df;background:#fff;display:flex;flex-direction:column;justify-content:center}
+.service-panel:last-child{border-bottom:1px solid #ccd6df}
+.service-panel:before{content:"";position:absolute;left:28px;top:0;bottom:0;width:3px;background:linear-gradient(var(--red),#b30f0b);opacity:.92}
+.service-panel-icon{width:70px;height:70px;color:var(--navy);display:grid;place-items:center;margin-bottom:22px}
+.service-panel-icon .icon-svg{font-size:64px}
+.service-no{position:absolute;top:30px;right:4px;margin:0;font-size:56px;line-height:1;font-weight:900;color:#edf1f5;letter-spacing:-.04em}
+.service-panel h3{font-size:34px;color:var(--navy);margin:0 0 14px;line-height:1.25}
+.service-panel>p:not(.service-no){font-size:15px;color:var(--muted);margin:0 0 20px;max-width:620px}
+.service-keyword{display:inline-block;width:max-content;max-width:100%;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--navy);border-bottom:2px solid var(--red);padding-bottom:5px}
+
+.concerns-title small{display:block;margin-top:18px;max-width:300px;font-family:-apple-system,BlinkMacSystemFont,"Yu Gothic",Meiryo,sans-serif;font-size:11px;line-height:1.85;color:#d7e2ec}
+.concern-item{border:0!important;box-shadow:none!important;border-bottom:1px solid #d8e1e9!important;background:rgba(255,255,255,.96)!important}
+.concern-item:nth-child(-n+2){border-top:1px solid #d8e1e9!important}
+.concern-item i{background:#edf2f6!important;color:var(--navy)!important}
+.concern-item i .icon-svg{font-size:28px}
+
+.strength-grid-updated{gap:34px!important}
+.strength-item{border:0!important;box-shadow:none!important;padding:0 0 24px!important;background:transparent!important;position:relative}
+.strength-item:not(:last-child){border-right:1px solid #dfe6ec!important;padding-right:28px!important}
+.strength-item .num{left:0!important;top:0!important;z-index:3}
+.strength-visual{height:220px;margin:0 0 26px;position:relative;overflow:hidden;background:#edf2f5}
+.strength-visual-symbol{display:grid;place-items:center;background:linear-gradient(145deg,#eef3f6,#dfe8ef)}
+.strength-symbol{width:116px;height:116px;fill:none;stroke:var(--navy);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.strength-visual img{width:100%;height:100%;object-fit:cover;display:block}
+.strength-visual-photo img{object-position:center 42%}
+.strength-visual-illustration{background:#f3f6f8}
+.strength-visual-illustration img{object-fit:contain;padding:8px 10px 0}
+.strength-visual figcaption{position:absolute;right:7px;bottom:6px;background:rgba(3,28,57,.72);color:#fff;font-size:8px;letter-spacing:.06em;padding:4px 7px}
+.strength-item h3{font-size:22px!important;margin:0 0 10px!important}
+.strength-item p{font-size:13px!important;line-height:1.9!important}
+
+.flow-list-updated{position:relative}
+.flow-list-updated:before{content:"";position:absolute;left:8%;right:8%;top:88px;height:1px;background:#ccd6df}
+.flow-list-updated li{border:0!important;background:transparent!important;min-height:230px!important;padding:22px 24px!important}
+.flow-list-updated li:after{content:""!important;display:none!important}
+.flow-list-updated span{z-index:2}
+.flow-list-updated i{width:70px;height:70px;margin:30px auto 16px!important;background:#f1f4f7;display:grid!important;place-items:center;border-radius:50%;color:var(--navy)}
+.flow-list-updated i .icon-svg{font-size:34px}
+.flow-list-updated i.shared-picto{overflow:hidden;padding:8px}
+.flow-list-updated i.shared-picto img{width:100%;height:100%;object-fit:contain}
+.flow-list-updated h3{font-size:17px!important}
+.flow-list-updated p{font-size:11px!important;line-height:1.75}
+
+.company-art-photo{background-image:linear-gradient(180deg,rgba(4,31,64,.08),rgba(4,31,64,.44)),url("images/metal-roof-detail.jpg?v=20260924-1728")!important;background-size:cover!important;background-position:center!important}
+.company-art-photo:before,.company-art-photo:after{display:none!important}
+.company-art-photo>span{position:absolute;left:18px;bottom:14px;z-index:2;color:rgba(255,255,255,.84);font-size:9px;letter-spacing:.08em;text-shadow:0 1px 5px rgba(0,0,0,.45)}
+
+@media(max-width:960px){
+  .service-story{gap:22px}
+  .service-sticky{flex-basis:39%}
+  .service-scroll{flex-basis:61%}
+  .service-sticky-inner{padding:26px;min-height:520px}
+  .service-sticky-media{margin-left:-26px;margin-right:-26px;min-height:265px}
+  .service-panel{min-height:360px;padding:48px 34px 40px 58px}
+  .strength-grid-updated{grid-template-columns:repeat(3,1fr)!important}
+  .strength-grid-updated article:last-child{grid-column:auto!important}
+}
+
+@media(max-width:640px){
+  html,body{overflow-x:clip}
+  .service-story-section{padding:64px 0!important;overflow:visible!important}
+  .service-story-section .section-head{margin-bottom:26px}
+  .service-story-section .section-head h2{font-size:31px}
+  .service-story-section .section-head>p:last-child{font-size:11px;line-height:1.8;text-align:left}
+  .service-story{display:flex;align-items:flex-start;gap:0;margin-top:26px;width:100%;min-width:0}
+  .service-sticky{flex:0 0 40%;min-width:0;position:sticky;top:calc(var(--header-h) + 10px);align-self:flex-start;z-index:4}
+  .service-sticky-inner{padding:16px 10px 18px;min-height:455px;overflow:visible}
+  .service-kicker{font-size:8px;line-height:1.5;margin-bottom:8px}
+  .service-sticky h3{font-size:20px;line-height:1.45;margin-bottom:12px}
+  .service-sticky-media{min-height:210px;margin:10px -10px 14px;background-position:58% center}
+  .service-visual{padding:18px 12px}
+  .service-visual-icon{width:68px;height:68px;margin-bottom:7px}
+  .service-visual strong{font-size:16px}
+  .visual-note{font-size:7px;right:5px;bottom:5px}
+  .service-sticky-note{font-size:8px;line-height:1.65}
+  .service-scroll{flex:0 0 60%;min-width:0;padding-left:10px}
+  .service-panel{min-height:355px;padding:42px 9px 32px 18px;min-width:0}
+  .service-panel:before{left:4px;width:2px}
+  .service-panel-icon{width:50px;height:50px;margin-bottom:14px}
+  .service-panel-icon .icon-svg{font-size:46px}
+  .service-no{font-size:34px;top:16px;right:0}
+  .service-panel h3{font-size:22px;margin-bottom:10px}
+  .service-panel>p:not(.service-no){font-size:11px;line-height:1.85;margin-bottom:16px}
+  .service-keyword{font-size:8px;line-height:1.55;white-space:normal}
+  .concerns-title small{font-size:9px;max-width:100%}
+  .concern-item{font-size:10px!important;min-height:86px!important}
+  .concern-item i{width:38px!important;height:38px!important}
+  .concern-item i .icon-svg{font-size:22px}
+  .strength-grid-updated{display:grid!important;grid-template-columns:1fr!important;gap:34px!important}
+  .strength-grid-updated article:last-child{grid-column:auto!important}
+  .strength-item{padding-bottom:10px!important}
+  .strength-item:not(:last-child){border-right:0!important;border-bottom:1px solid #dfe6ec!important;padding-right:0!important;padding-bottom:30px!important}
+  .strength-visual{height:205px}
+  .strength-symbol{width:96px;height:96px}
+  .flow-list-updated{grid-template-columns:1fr 1fr!important;gap:0!important}
+  .flow-list-updated:before{display:none}
+  .flow-list-updated li{min-height:210px!important;padding:18px 10px!important;border-bottom:1px solid #e0e7ed!important}
+  .flow-list-updated li:nth-child(odd){border-right:1px solid #e0e7ed!important}
+  .flow-list-updated i{width:56px;height:56px;margin:28px auto 12px!important}
+  .flow-list-updated i .icon-svg{font-size:28px}
+  .company{padding-top:230px!important}
+  .company-art-photo{height:260px!important;background-position:62% center!important}
+  .company-art-photo>span{font-size:8px;left:10px;bottom:8px}
+}
+
+@media(max-width:390px){
+  .service-sticky{flex-basis:40%}
+  .service-scroll{flex-basis:60%;padding-left:8px}
+  .service-sticky-inner{padding-left:9px;padding-right:9px}
+  .service-sticky h3{font-size:19px}
+  .service-panel{padding-left:16px;padding-right:7px}
+}
+
+@media(max-width:375px){
+  .service-sticky h3{font-size:18px}
+  .service-panel h3{font-size:20px}
+  .service-panel>p:not(.service-no){font-size:10px}
+}
