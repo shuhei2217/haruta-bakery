@@ -46,36 +46,56 @@ const serviceStickyContent = {
 };
 
 let activeServiceName = 'sheetmetal';
-let serviceChangeTimer = null;
+let serviceScrollTicking = false;
 
 function activateService(name){
   const content = serviceStickyContent[name];
   if (!content || !serviceStickyTitle || name === activeServiceName) return;
 
   activeServiceName = name;
-  if (serviceChangeTimer) window.clearTimeout(serviceChangeTimer);
-
-  serviceStickyTitle.classList.add('is-changing');
-  if (serviceStickyCopy) serviceStickyCopy.classList.add('is-changing');
-
-  serviceChangeTimer = window.setTimeout(() => {
-    serviceStickyTitle.textContent = content.title;
-    if (serviceStickyCopy) serviceStickyCopy.textContent = content.copy;
-    serviceStickyTitle.classList.remove('is-changing');
-    if (serviceStickyCopy) serviceStickyCopy.classList.remove('is-changing');
-    serviceChangeTimer = null;
-  }, 90);
+  serviceStickyTitle.textContent = content.title;
+  if (serviceStickyCopy) serviceStickyCopy.textContent = content.copy;
 }
 
-if (servicePanels.length && serviceStickyTitle && 'IntersectionObserver' in window) {
-  const serviceObserver = new IntersectionObserver(entries => {
-    const visible = entries
-      .filter(entry => entry.isIntersecting)
-      .sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (visible) activateService(visible.target.dataset.service);
-  }, {
-    threshold: [0.2, 0.45, 0.7],
-    rootMargin: '-18% 0px -36% 0px'
+function updateActiveServiceFromScroll(){
+  if (!servicePanels.length || !serviceStickyTitle) return;
+
+  const anchorY = window.innerHeight * 0.42;
+  let selected = null;
+
+  for (const panel of servicePanels) {
+    const rect = panel.getBoundingClientRect();
+    if (rect.top <= anchorY && rect.bottom > anchorY) {
+      selected = panel;
+      break;
+    }
+  }
+
+  if (!selected) {
+    selected = servicePanels.reduce((closest, panel) => {
+      const rect = panel.getBoundingClientRect();
+      const center = rect.top + rect.height / 2;
+      const distance = Math.abs(center - anchorY);
+      if (!closest || distance < closest.distance) return { panel, distance };
+      return closest;
+    }, null)?.panel || null;
+  }
+
+  if (selected) activateService(selected.dataset.service);
+}
+
+function scheduleServiceUpdate(){
+  if (serviceScrollTicking) return;
+  serviceScrollTicking = true;
+  window.requestAnimationFrame(() => {
+    updateActiveServiceFromScroll();
+    serviceScrollTicking = false;
   });
-  servicePanels.forEach(panel => serviceObserver.observe(panel));
 }
+
+if (servicePanels.length && serviceStickyTitle) {
+  window.addEventListener('scroll', scheduleServiceUpdate, { passive: true });
+  window.addEventListener('resize', scheduleServiceUpdate);
+  updateActiveServiceFromScroll();
+}
+
