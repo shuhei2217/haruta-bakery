@@ -1,0 +1,64 @@
+name: Diagnose Ino Bankin Live Page
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/diagnose-ino-bankin-live.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Diagnose live mobile page
+        run: |
+          node - <<'NODE' > ino-bankin-preview/live-diagnostic.txt
+          const { chromium } = require('playwright');
+          (async()=>{
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage({viewport:{width:390,height:844}, deviceScaleFactor:1});
+            const errors=[];
+            page.on('pageerror', e=>errors.push('pageerror:'+e.message));
+            page.on('console', m=>{if(m.type()==='error') errors.push('console:'+m.text())});
+            const responses=[];
+            page.on('response', r=>{ if(r.status()>=400) responses.push(r.status()+' '+r.url()) });
+            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/', {waitUntil:'networkidle', timeout:60000});
+            await page.waitForTimeout(3000);
+            const data = await page.evaluate(()=>({
+              href: location.href,
+              title: document.title,
+              innerWidth: innerWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              jsMotion: document.documentElement.classList.contains('js-motion'),
+              revealCount: document.querySelectorAll('.reveal').length,
+              visibleCount: document.querySelectorAll('.reveal.visible').length,
+              samples: [...document.querySelectorAll('.reveal')].slice(0,12).map(el=>({
+                tag:el.tagName,class:el.className,
+                opacity:getComputedStyle(el).opacity,
+                transform:getComputedStyle(el).transform,
+                top:Math.round(el.getBoundingClientRect().top)
+              }))
+            }));
+            console.log(JSON.stringify({data,errors,responses},null,2));
+            await browser.close();
+          })();
+          NODE
+          cat ino-bankin-preview/live-diagnostic.txt
+      - name: Commit diagnostic
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ino-bankin-preview/live-diagnostic.txt
+          git commit -m "Record live display diagnostic" || exit 0
+          git push origin HEAD:ino-bankin-preview
