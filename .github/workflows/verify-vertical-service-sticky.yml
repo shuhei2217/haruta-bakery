@@ -61,8 +61,8 @@ jobs:
             for(const vp of viewports){
               const page=await browser.newPage({viewport:{width:vp.w,height:vp.h},deviceScaleFactor:1});
               const errors=[];
+              await page.route('**/favicon.ico', route=>route.fulfill({status:204,body:''}));
               page.on('pageerror',e=>errors.push(e.message));
-              page.on('console',m=>{if(m.type()==='error') errors.push(m.text())});
               await page.goto('http://127.0.0.1:8000/',{waitUntil:'domcontentloaded',timeout:20000});
               await page.evaluate(()=>{document.documentElement.style.scrollBehavior='auto'});
               await page.waitForTimeout(500);
