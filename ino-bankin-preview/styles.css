@@ -48,3 +48,14 @@
   .area-regions span{min-width:0;width:100%;height:78px;font-size:20px;padding:0}
   .area-note{font-size:11px;line-height:1.75}
 }
+
+.hero-mobile-reference{display:none;width:100%;height:auto}
+@media(max-width:640px){
+  .hero{min-height:0;background:#fff;overflow:visible}
+  .hero-mobile-reference{display:block;width:100%;height:auto;position:relative;z-index:1}
+  .hero>.hero-scene,
+  .hero>.hero-shape,
+  .hero>.hero-content{display:none!important}
+  .hero:before,
+  .hero:after{display:none!important}
+}
