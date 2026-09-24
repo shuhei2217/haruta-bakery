@@ -1,0 +1,67 @@
+name: Deploy Ino Bankin Preview
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - 'ino-bankin-preview/**'
+      - '.github/workflows/deploy-ino-bankin-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xserver-deploy-ino-bankin-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+
+      - name: Verify preview files
+        run: |
+          test -f ino-bankin-preview/index.html
+          test -f ino-bankin-preview/styles.css
+          test -f ino-bankin-preview/script.js
+          grep -q "井野板金工業" ino-bankin-preview/index.html
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy preview folder only
+        timeout-minutes: 7
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            echo "FTP preview deploy attempt ${attempt}/3"
+            if timeout 120s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+              set ftp:ssl-allow no;
+              set ftp:passive-mode true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 20;
+              mkdir -p ino-bankin-preview;
+              mirror -R --verbose --parallel=2 ino-bankin-preview/ ./ino-bankin-preview/;
+              bye
+            "; then
+              echo "FTP preview deploy succeeded"
+              exit 0
+            fi
+            rc=$?
+            echo "FTP preview deploy attempt ${attempt} failed or timed out (exit ${rc})"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          exit 1
