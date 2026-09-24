@@ -1,0 +1,58 @@
+name: Prepare Ino Improvement Assets
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/prepare-ino-improvement-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+      - name: Download selected assets
+        env:
+          INSPECTION_URL: 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-7580-81f4-a33c-194fc71d9849/raw?se=2026-09-24T08%3A43%3A37Z&sp=r&sv=2026-02-06&sr=b&scid=2c894fe5-492d-59a5-a6cb-54b84c7d6c22&skoid=0765b554-4b90-4fa2-9d6d-0055a2427910&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T07%3A56%3A17Z&ske=2026-09-25T07%3A56%3A17Z&sks=b&skv=2026-02-06&sig=0uyvnw2zZOIjfy35R8hCUaJRHxlxaB1u0DBzP4iJL1o%3D'
+          CHECK_URL: 'https://sdmntprpolandcentral.oaiusercontent.com/files/00000000-1830-820a-84a5-e59d9a20a915/raw?se=2026-09-24T08%3A43%3A43Z&sp=r&sv=2026-02-06&sr=b&scid=f24b9427-c2cc-5aae-ae68-d340b54ce078&skoid=0765b554-4b90-4fa2-9d6d-0055a2427910&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T06%3A43%3A49Z&ske=2026-09-25T06%3A43%3A49Z&sks=b&skv=2026-02-06&sig=Y5aHnTfs04rVjbDm75LH6oEA9UIas0dx/utIi6tawlE%3D'
+          METAL_URL: 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-dd48-820e-b4b2-4746400688e9/raw?se=2026-09-24T08%3A44%3A09Z&sp=r&sv=2026-02-06&sr=b&scid=5c56bdbb-83ac-5f14-84de-cbb2cf534d52&skoid=0765b554-4b90-4fa2-9d6d-0055a2427910&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-24T07%3A21%3A33Z&ske=2026-09-25T07%3A21%3A33Z&sks=b&skv=2026-02-06&sig=/4e/u7y0CPzJ4eKjAND043jTs8SWbF0KiWEFgOTV5j8%3D'
+        run: |
+          mkdir -p ino-bankin-preview/images/source
+          curl -fL --retry 3 "$INSPECTION_URL" -o ino-bankin-preview/images/source/inspection.png
+          curl -fL --retry 3 "$CHECK_URL" -o ino-bankin-preview/images/source/check.png
+          curl -fL --retry 3 "$METAL_URL" -o ino-bankin-preview/images/source/metal.png
+      - name: Optimize assets
+        run: |
+          python -m pip install pillow >/dev/null
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          src=Path('ino-bankin-preview/images/source')
+          out=Path('ino-bankin-preview/images')
+          # shared illustration
+          im=Image.open(src/'inspection.png').convert('RGBA')
+          im.thumbnail((720,720), Image.LANCZOS)
+          im.save(out/'shared-exterior-inspection.png', optimize=True)
+          # shared pictogram
+          im=Image.open(src/'check.png').convert('RGBA')
+          im.thumbnail((320,320), Image.LANCZOS)
+          im.save(out/'shared-exterior-check.png', optimize=True)
+          # site-specific generic metalwork image
+          im=Image.open(src/'metal.png').convert('RGB')
+          im.thumbnail((1400,900), Image.LANCZOS)
+          im.save(out/'metal-roof-detail.jpg', quality=84, optimize=True, progressive=True)
+          PY
+          rm -rf ino-bankin-preview/images/source
+      - name: Commit assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ino-bankin-preview/images/
+          git commit -m "Add selected Ino improvement visual assets"
+          git push origin HEAD:ino-bankin-preview
