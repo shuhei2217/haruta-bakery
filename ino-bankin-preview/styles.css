@@ -60,3 +60,52 @@ img{max-width:100%;height:auto;display:block}
   .hero:before,
   .hero:after{display:none!important}
 }
+
+/* 2026-09-24 14:37 JST: show more of the hero photo on mobile */
+@media(max-width:640px){
+  .hero{
+    min-height:690px!important;
+    height:auto!important;
+    overflow:hidden!important;
+    position:relative!important;
+    background:#061d3b!important;
+  }
+  .hero-mobile-reference{display:none!important}
+  .hero>.hero-scene{
+    display:block!important;
+    position:absolute!important;
+    inset:0!important;
+    z-index:-3!important;
+    background-size:cover!important;
+    background-position:62% center!important;
+    background-repeat:no-repeat!important;
+  }
+  .hero>.hero-shape{
+    display:block!important;
+    position:absolute!important;
+    inset:-4% 26% -6% -48%!important;
+    clip-path:polygon(0 0,82% 0,100% 32%,72% 100%,0 100%)!important;
+    background:linear-gradient(135deg,rgba(9,61,114,.68),rgba(3,34,72,.58))!important;
+    z-index:-1!important;
+    box-shadow:18px 0 42px rgba(1,21,45,.10);
+  }
+  .hero>.hero-content{
+    display:flex!important;
+    min-height:690px!important;
+    padding:34px 0 70px!important;
+    position:relative!important;
+    z-index:1!important;
+  }
+  .hero-message{
+    width:96%!important;
+    padding-top:14px!important;
+  }
+  .hero-small,.headline-b,.hero-sub,.hero-desc{
+    text-shadow:0 2px 9px rgba(0,0,0,.34);
+  }
+  .hero:before{display:none!important}
+  .hero:after{
+    display:block!important;
+    background:linear-gradient(90deg,rgba(3,27,56,.10),rgba(3,27,56,0) 72%)!important;
+  }
+}
