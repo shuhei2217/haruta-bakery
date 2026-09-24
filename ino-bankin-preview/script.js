@@ -45,16 +45,25 @@ const serviceStickyContent = {
   }
 };
 
+let activeServiceName = 'sheetmetal';
+let serviceChangeTimer = null;
+
 function activateService(name){
   const content = serviceStickyContent[name];
-  if (!content || !serviceStickyTitle) return;
+  if (!content || !serviceStickyTitle || name === activeServiceName) return;
+
+  activeServiceName = name;
+  if (serviceChangeTimer) window.clearTimeout(serviceChangeTimer);
+
   serviceStickyTitle.classList.add('is-changing');
   if (serviceStickyCopy) serviceStickyCopy.classList.add('is-changing');
-  window.setTimeout(() => {
+
+  serviceChangeTimer = window.setTimeout(() => {
     serviceStickyTitle.textContent = content.title;
     if (serviceStickyCopy) serviceStickyCopy.textContent = content.copy;
     serviceStickyTitle.classList.remove('is-changing');
     if (serviceStickyCopy) serviceStickyCopy.classList.remove('is-changing');
+    serviceChangeTimer = null;
   }, 90);
 }
 
