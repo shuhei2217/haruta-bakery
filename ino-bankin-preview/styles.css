@@ -751,3 +751,25 @@ img{max-width:100%;height:auto;display:block}
   .craft-lines p{font-size:10px}
   .concern-item>span{font-size:11.5px}
 }
+
+
+/* ===== 2026-09-24 replace generated architecture with real Pexels photos ===== */
+.hero-scene{
+  background-image:url("images/pexels-hero-metal-roof.jpg?v=20260924-2022")!important;
+  background-size:cover!important;
+  background-position:center 38%!important;
+  background-repeat:no-repeat!important;
+}
+.craft-photo img{
+  object-position:center 42%!important;
+}
+@media(max-width:640px){
+  .hero>.hero-scene{
+    background-image:url("images/pexels-hero-metal-roof.jpg?v=20260924-2022")!important;
+    background-position:52% 42%!important;
+    background-size:cover!important;
+  }
+  .craft-photo img{
+    object-position:center 40%!important;
+  }
+}
