@@ -1,4 +1,4 @@
-name: Verify Pexels Roof Photos
+name: Verify Pexels Roof Photos V2
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
             page.on('pageerror',e=>errors.push('pageerror:'+e.message));
             page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
             page.on('response',r=>{if(r.status()>=400) bad.push(r.status()+' '+r.url())});
-            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2022',{waitUntil:'domcontentloaded',timeout:30000});
+            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2024',{waitUntil:'domcontentloaded',timeout:30000});
             await page.waitForTimeout(2200);
             const info=await page.evaluate(()=>({
               innerWidth,
