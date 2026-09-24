@@ -43,9 +43,14 @@ jobs:
               page.on('pageerror',e=>errors.push('pageerror:'+e.message));
               page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
               page.on('response',r=>{if(r.status()>=400) badResponses.push(r.status()+' '+r.url())});
-              await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?verify=20260924-1728-'+vp.w,{waitUntil:'domcontentloaded',timeout:30000});
+              let navError=null;
+              try{
+                await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?verify=20260924-1728-'+vp.w,{waitUntil:'commit',timeout:30000});
+              }catch(e){ navError=e.message; }
+              await page.waitForSelector('body',{state:'attached',timeout:30000});
+              await page.waitForFunction(()=>document.querySelector('.service-story') && document.querySelector('#faq'),null,{timeout:30000});
               await page.evaluate(()=>{ document.documentElement.style.scrollBehavior='auto'; });
-              await page.waitForTimeout(1200);
+              await page.waitForTimeout(1500);
 
               // Trigger every lazy-loaded image before image health checks.
               const pageHeight=await page.evaluate(()=>document.documentElement.scrollHeight);
@@ -105,7 +110,7 @@ jobs:
               await page.waitForTimeout(150);
               await page.screenshot({path:`verify/${vp.name}-full.png`,fullPage:true});
 
-              results.push({vp,base,faqOpen,stickyTopCss,samples,errors,badResponses});
+              results.push({vp,base,faqOpen,stickyTopCss,samples,navError,errors,badResponses});
 
               if(base.scrollWidth!==vp.w) throw new Error(vp.name+' horizontal overflow '+base.scrollWidth);
               if(base.imageErrors.length) throw new Error(vp.name+' image errors '+base.imageErrors.join(','));
