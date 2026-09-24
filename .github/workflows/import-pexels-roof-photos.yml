@@ -1,0 +1,51 @@
+name: Import Pexels Roof Photos
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/import-pexels-roof-photos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+
+      - name: Download selected Pexels photos
+        run: |
+          mkdir -p ino-bankin-preview/images
+          curl -fL --retry 3 --max-time 60 'https://images.pexels.com/photos/17870967/pexels-photo-17870967.png?cs=srgb&dl=pexels-plasticlines-17870967.jpg&fm=jpg' -o ino-bankin-preview/images/pexels-hero-metal-roof.jpg
+          curl -fL --retry 3 --max-time 60 'https://images.pexels.com/photos/11767927/pexels-photo-11767927.jpeg?cs=srgb&dl=pexels-matildai-11767927.jpg&fm=jpg' -o ino-bankin-preview/images/pexels-craft-metal-roof.jpg
+          test -s ino-bankin-preview/images/pexels-hero-metal-roof.jpg
+          test -s ino-bankin-preview/images/pexels-craft-metal-roof.jpg
+
+      - name: Optimize photos
+        run: |
+          python -m pip install pillow >/dev/null
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          for name, max_size in [
+              ('pexels-hero-metal-roof.jpg',(1600,2200)),
+              ('pexels-craft-metal-roof.jpg',(1400,1800)),
+          ]:
+              p=Path('ino-bankin-preview/images')/name
+              im=Image.open(p).convert('RGB')
+              im.thumbnail(max_size, Image.LANCZOS)
+              im.save(p, quality=84, optimize=True, progressive=True)
+          PY
+
+      - name: Commit photos
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ino-bankin-preview/images/pexels-hero-metal-roof.jpg ino-bankin-preview/images/pexels-craft-metal-roof.jpg
+          git commit -m "Add licensed Pexels roof photos"
+          git push origin HEAD:ino-bankin-preview
