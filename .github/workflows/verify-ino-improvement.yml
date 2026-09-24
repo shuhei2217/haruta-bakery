@@ -1,0 +1,122 @@
+name: Verify Ino Improvement
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/verify-ino-improvement.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+      - name: Verify PC and mobile
+        run: |
+          mkdir -p verify
+          node - <<'NODE'
+          const fs=require('fs');
+          const { chromium }=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const viewports=[
+              {name:'pc',w:1440,h:1000},
+              {name:'m375',w:375,h:812},
+              {name:'m390',w:390,h:844},
+              {name:'m430',w:430,h:900},
+            ];
+            const results=[];
+            for(const vp of viewports){
+              const page=await browser.newPage({viewport:{width:vp.w,height:vp.h},deviceScaleFactor:1});
+              const errors=[], badResponses=[];
+              page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+              page.on('console',m=>{if(m.type()==='error') errors.push('console:'+m.text())});
+              page.on('response',r=>{if(r.status()>=400) badResponses.push(r.status()+' '+r.url())});
+              await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?verify=20260924-1728-'+vp.w,{waitUntil:'domcontentloaded',timeout:30000});
+              await page.waitForTimeout(2200);
+
+              const base=await page.evaluate(()=>({
+                innerWidth,
+                scrollWidth:document.documentElement.scrollWidth,
+                scrollHeight:document.documentElement.scrollHeight,
+                imageErrors:[...document.images].filter(i=>!i.complete||i.naturalWidth===0).map(i=>i.src),
+                telHrefs:[...document.querySelectorAll('a[href^="tel:"]')].map(a=>a.getAttribute('href')),
+                faqCount:document.querySelectorAll('#faq details').length,
+                serviceDisplay:getComputedStyle(document.querySelector('.service-story')).display,
+                stickyPosition:getComputedStyle(document.querySelector('.service-sticky')).position,
+                leftBasis:getComputedStyle(document.querySelector('.service-sticky')).flexBasis,
+                rightBasis:getComputedStyle(document.querySelector('.service-scroll')).flexBasis,
+                visibleText:document.body.innerText.includes('建築板金') && document.body.innerText.includes('屋根工事') && document.body.innerText.includes('外壁工事'),
+              }));
+
+              // FAQ native open check
+              const faq=page.locator('#faq details').first();
+              await faq.locator('summary').click();
+              const faqOpen=await faq.evaluate(el=>el.open);
+
+              // sticky behavior check
+              const serviceBox=await page.locator('#services').boundingBox();
+              const stickyTopCss=await page.locator('.service-sticky').evaluate(el=>parseFloat(getComputedStyle(el).top)||0);
+              const samples=[];
+              if(serviceBox){
+                const points=[
+                  serviceBox.y+Math.min(220,serviceBox.height*.18),
+                  serviceBox.y+Math.min(520,serviceBox.height*.42),
+                  serviceBox.y+Math.min(850,serviceBox.height*.67)
+                ];
+                for(const y of points){
+                  await page.evaluate(y=>window.scrollTo(0,y),y);
+                  await page.waitForTimeout(250);
+                  const r=await page.locator('.service-sticky').boundingBox();
+                  const active=await page.locator('.service-visual.is-active strong').textContent().catch(()=>null);
+                  samples.push({scrollY:y,top:r?Math.round(r.y):null,active});
+                }
+              }
+
+              await page.evaluate(()=>window.scrollTo(0,0));
+              await page.waitForTimeout(150);
+              await page.screenshot({path:`verify/${vp.name}-full.png`,fullPage:true});
+
+              results.push({vp,base,faqOpen,stickyTopCss,samples,errors,badResponses});
+
+              if(base.scrollWidth!==vp.w) throw new Error(vp.name+' horizontal overflow '+base.scrollWidth);
+              if(base.imageErrors.length) throw new Error(vp.name+' image errors '+base.imageErrors.join(','));
+              if(!base.telHrefs.includes('tel:0582948544')) throw new Error(vp.name+' tel missing');
+              if(!faqOpen) throw new Error(vp.name+' FAQ failed');
+              if(errors.length) throw new Error(vp.name+' JS errors '+errors.join(' | '));
+              if(badResponses.length) throw new Error(vp.name+' HTTP errors '+badResponses.join(' | '));
+              if(!base.visibleText) throw new Error(vp.name+' service text missing');
+
+              if(vp.w<=430){
+                if(base.stickyPosition!=='sticky') throw new Error(vp.name+' mobile sticky disabled: '+base.stickyPosition);
+                if(!['40%','150px','156px','172px'].includes(base.leftBasis) && parseFloat(base.leftBasis)<=0) throw new Error(vp.name+' bad left basis '+base.leftBasis);
+              }
+              if(samples.length>=2){
+                const expected=stickyTopCss;
+                const stuck=samples.slice(1).some(s=>s.top!==null && Math.abs(s.top-expected)<=3);
+                if(!stuck) throw new Error(vp.name+' sticky did not hold '+JSON.stringify({expected,samples}));
+              }
+
+              await page.close();
+            }
+            fs.writeFileSync('verify/diagnostic.json',JSON.stringify(results,null,2));
+            console.log(JSON.stringify(results,null,2));
+            await browser.close();
+          })();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ino-improvement-verification
+          path: verify/
+          retention-days: 1
