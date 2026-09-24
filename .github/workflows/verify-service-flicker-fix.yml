@@ -1,0 +1,73 @@
+name: Verify Service Flicker Fix
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - '.github/workflows/verify-service-flicker-fix.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ino-bankin-preview
+
+      - name: Confirm live version
+        run: |
+          curl -fsSL --max-time 25 'https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2342' -o /tmp/live.html
+          grep -q 'script.js?v=20260924-2342' /tmp/live.html
+
+      - name: Verify no repeated flicker
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          node - <<'NODE'
+          const { chromium }=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const page=await browser.newPage({viewport:{width:390,height:844}});
+            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2342',{waitUntil:'domcontentloaded',timeout:30000});
+            await page.waitForSelector('#serviceStickyTitle',{timeout:20000});
+            await page.evaluate(()=>{
+              window.__flicker={classAdds:0,textChanges:0};
+              const title=document.querySelector('#serviceStickyTitle');
+              const mo=new MutationObserver(muts=>{
+                for(const m of muts){
+                  if(m.type==='attributes' && m.attributeName==='class' && title.classList.contains('is-changing')) window.__flicker.classAdds++;
+                  if(m.type==='childList' || m.type==='characterData') window.__flicker.textChanges++;
+                }
+              });
+              mo.observe(title,{attributes:true,childList:true,characterData:true,subtree:true});
+              window.__flickerObserver=mo;
+            });
+
+            const panel0=page.locator('.service-panel').nth(0);
+            const box0=await panel0.boundingBox();
+            const baseY=await panel0.evaluate(el=>el.getBoundingClientRect().top+scrollY);
+            for(const delta of [120,150,180,210,240,200,170,140,110]){
+              await page.evaluate(y=>scrollTo(0,y), Math.max(0,baseY+delta-300));
+              await page.waitForTimeout(120);
+            }
+            await page.waitForTimeout(250);
+            const samePanel=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),...window.__flicker}));
+
+            const panel1Y=await page.locator('.service-panel').nth(1).evaluate(el=>el.getBoundingClientRect().top+scrollY+el.offsetHeight*.45);
+            await page.evaluate(y=>scrollTo(0,y-innerHeight*.35),panel1Y);
+            await page.waitForTimeout(450);
+            const afterRoof=await page.evaluate(()=>({title:document.querySelector('#serviceStickyTitle').textContent.trim(),...window.__flicker}));
+
+            console.log(JSON.stringify({samePanel,afterRoof},null,2));
+            if(samePanel.title!=='建築板金') throw new Error('unexpected title in first panel');
+            if(samePanel.classAdds!==0 || samePanel.textChanges!==0) throw new Error('repeated flicker while staying in same panel');
+            if(afterRoof.title!=='屋根') throw new Error('title did not switch to roof');
+            if(afterRoof.classAdds>1) throw new Error('too many animation triggers on one service change: '+afterRoof.classAdds);
+            await browser.close();
+          })();
+          NODE
