@@ -20,8 +20,8 @@ jobs:
 
       - name: Confirm live CSS version
         run: |
-          curl -fsSL --max-time 25 'https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2225' -o /tmp/live.html
-          grep -q 'styles.css?v=20260924-2225' /tmp/live.html
+          curl -fsSL --max-time 25 'https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2232' -o /tmp/live.html
+          grep -q 'styles.css?v=20260924-2232' /tmp/live.html
 
       - name: Verify mobile title size
         run: |
@@ -35,7 +35,7 @@ jobs:
           (async()=>{
             const browser=await chromium.launch({headless:true});
             const page=await browser.newPage({viewport:{width:390,height:844}});
-            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2225',{waitUntil:'commit',timeout:30000}).catch(()=>{});
+            await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?v=20260924-2232',{waitUntil:'commit',timeout:30000}).catch(()=>{});
             await page.waitForSelector('.service-vertical-title',{timeout:30000});
             await page.waitForTimeout(800);
             const info=await page.evaluate(()=>({
