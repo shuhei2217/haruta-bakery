@@ -1,4 +1,4 @@
-name: Verify Ino Improvement
+name: Verify Ino Final Polish
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,9 +22,9 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install playwright@1.55.0 >/dev/null 2>&1
           npx playwright install --with-deps chromium >/dev/null 2>&1
-      - name: Verify PC and mobile
+      - name: Verify public site
         run: |
-          mkdir -p verify
+          mkdir -p verify-final
           node - <<'NODE'
           const fs=require('fs');
           const { chromium }=require('playwright');
@@ -45,100 +45,140 @@ jobs:
               page.on('response',r=>{if(r.status()>=400) badResponses.push(r.status()+' '+r.url())});
               let navError=null;
               try{
-                await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?verify=20260924-1728-'+vp.w,{waitUntil:'commit',timeout:30000});
+                await page.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?final=20260924-1808-'+vp.w,{waitUntil:'commit',timeout:30000});
               }catch(e){ navError=e.message; }
               await page.waitForSelector('body',{state:'attached',timeout:30000});
-              await page.waitForFunction(()=>document.querySelector('.service-story') && document.querySelector('#faq'),null,{timeout:30000});
+              await page.waitForFunction(()=>document.querySelector('.service-story') && document.querySelector('#faq') && document.querySelector('#contact'),null,{timeout:30000});
               await page.evaluate(()=>{ document.documentElement.style.scrollBehavior='auto'; });
-              await page.waitForTimeout(1500);
+              await page.waitForTimeout(1300);
 
-              // Trigger every lazy-loaded image before image health checks.
               const pageHeight=await page.evaluate(()=>document.documentElement.scrollHeight);
-              for(let y=0;y<pageHeight;y+=Math.max(450,Math.floor(vp.h*.7))){
+              for(let y=0;y<pageHeight;y+=Math.max(450,Math.floor(vp.h*.72))){
                 await page.evaluate(y=>window.scrollTo(0,y),y);
-                await page.waitForTimeout(120);
+                await page.waitForTimeout(100);
               }
               await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
-              await page.waitForTimeout(800);
+              await page.waitForTimeout(650);
               await page.evaluate(()=>window.scrollTo(0,0));
-              await page.waitForTimeout(300);
+              await page.waitForTimeout(250);
 
-              const base=await page.evaluate(()=>({
-                innerWidth,
-                scrollWidth:document.documentElement.scrollWidth,
-                scrollHeight:document.documentElement.scrollHeight,
-                imageErrors:[...document.images].filter(i=>!i.complete||i.naturalWidth===0).map(i=>i.src),
-                telHrefs:[...document.querySelectorAll('a[href^="tel:"]')].map(a=>a.getAttribute('href')),
-                faqCount:document.querySelectorAll('#faq details').length,
-                serviceDisplay:getComputedStyle(document.querySelector('.service-story')).display,
-                stickyPosition:getComputedStyle(document.querySelector('.service-sticky')).position,
-                leftBasis:getComputedStyle(document.querySelector('.service-sticky')).flexBasis,
-                rightBasis:getComputedStyle(document.querySelector('.service-scroll')).flexBasis,
-                visibleText:document.body.innerText.includes('建築板金') && document.body.innerText.includes('屋根工事') && document.body.innerText.includes('外壁工事'),
-              }));
+              const base=await page.evaluate(()=> {
+                const txt=document.body.innerText;
+                const sticky=document.querySelector('.service-sticky');
+                const scroll=document.querySelector('.service-scroll');
+                const serviceP=document.querySelector('.service-panel p:not(.service-no)');
+                const sourceNote=document.querySelector('.source-note');
+                const badPhrases=['公開情報では','第三者掲載情報では','正式公開前','一般的な流れのイメージ','提案用デモ','右の内容を読み進めても'];
+                return {
+                  innerWidth,
+                  scrollWidth:document.documentElement.scrollWidth,
+                  imageErrors:[...document.images].filter(i=>!i.complete||i.naturalWidth===0).map(i=>i.src),
+                  telHrefs:[...document.querySelectorAll('a[href^="tel:"]')].map(a=>a.getAttribute('href')),
+                  contactLinks:[...document.querySelectorAll('a[href="#contact"]')].map(a=>a.textContent.trim()),
+                  faqCount:document.querySelectorAll('#faq details').length,
+                  stickyPosition:getComputedStyle(sticky).position,
+                  leftBasis:getComputedStyle(sticky).flexBasis,
+                  rightBasis:getComputedStyle(scroll).flexBasis,
+                  serviceFont:parseFloat(getComputedStyle(serviceP).fontSize),
+                  sourceNoteExists:!!sourceNote,
+                  forbidden:badPhrases.filter(p=>txt.includes(p)),
+                  footerDemo:txt.includes('CIAO 提案用サイト'),
+                  serviceText:['建築板金','屋根工事','外壁工事'].every(s=>txt.includes(s)),
+                  areaText:document.querySelector('#area')?.innerText.replace(/\s+/g,' ').trim()||'',
+                  flowTitle:document.querySelector('#flow h2')?.textContent.trim()||''
+                };
+              });
 
-              // FAQ native open check
+              // FAQ
               const faq=page.locator('#faq details').first();
               await faq.locator('summary').click();
               const faqOpen=await faq.evaluate(el=>el.open);
 
-              // sticky behavior check using document coordinates, independent of FAQ auto-scroll.
+              // menu mobile
+              let menuOk=true;
+              if(vp.w<=430){
+                await page.locator('.menu-button').click();
+                menuOk=await page.locator('.drawer').evaluate(el=>el.classList.contains('open') && el.getAttribute('aria-hidden')==='false');
+                await page.locator('.drawer-close').click();
+              }
+
+              // sticky behavior using direct DOM viewport rects
               const storyMetrics=await page.locator('.service-story').evaluate(el=>{
                 const r=el.getBoundingClientRect();
                 return {top:r.top+window.scrollY,height:r.height};
               });
               const stickyTopCss=await page.locator('.service-sticky').evaluate(el=>parseFloat(getComputedStyle(el).top)||0);
               const samples=[];
-              const offsets=[180,350,500].map(v=>Math.min(v,Math.max(160,storyMetrics.height*.52)));
-              for(const off of offsets){
-                const y=Math.max(0,storyMetrics.top+off);
+              for(const off of [180,350,500]){
+                const y=Math.max(0,storyMetrics.top+Math.min(off,storyMetrics.height*.52));
                 await page.evaluate(y=>window.scrollTo(0,y),y);
-                await page.waitForTimeout(120);
-                const sample=await page.evaluate(()=>{
+                await page.waitForTimeout(130);
+                samples.push(await page.evaluate((requested)=>{
                   const s=document.querySelector('.service-sticky');
                   const active=document.querySelector('.service-visual.is-active strong');
                   return {
+                    requested:Math.round(requested),
                     actualScrollY:Math.round(window.scrollY),
                     top:Math.round(s.getBoundingClientRect().top),
                     active:active?active.textContent.trim():null
                   };
-                });
-                samples.push({requested:Math.round(y),...sample});
+                },y));
               }
 
               await page.evaluate(()=>window.scrollTo(0,0));
-              await page.waitForTimeout(150);
-              await page.screenshot({path:`verify/${vp.name}-full.png`,fullPage:true});
+              await page.waitForTimeout(120);
+              await page.screenshot({path:`verify-final/${vp.name}-full.png`,fullPage:true});
 
-              results.push({vp,base,faqOpen,stickyTopCss,samples,navError,errors,badResponses});
+              results.push({vp,base,faqOpen,menuOk,stickyTopCss,samples,navError,errors,badResponses});
 
               if(base.scrollWidth!==vp.w) throw new Error(vp.name+' horizontal overflow '+base.scrollWidth);
               if(base.imageErrors.length) throw new Error(vp.name+' image errors '+base.imageErrors.join(','));
               if(!base.telHrefs.includes('tel:0582948544')) throw new Error(vp.name+' tel missing');
+              if(!base.contactLinks.some(t=>t.includes('ご相談はこちら'))) throw new Error(vp.name+' contact CTA mismatch '+JSON.stringify(base.contactLinks));
               if(!faqOpen) throw new Error(vp.name+' FAQ failed');
+              if(!menuOk) throw new Error(vp.name+' menu failed');
               if(errors.length) throw new Error(vp.name+' JS errors '+errors.join(' | '));
               if(badResponses.length) throw new Error(vp.name+' HTTP errors '+badResponses.join(' | '));
-              if(!base.visibleText) throw new Error(vp.name+' service text missing');
+              if(base.forbidden.length) throw new Error(vp.name+' forbidden public copy '+base.forbidden.join(','));
+              if(base.sourceNoteExists) throw new Error(vp.name+' source note still visible');
+              if(!base.footerDemo) throw new Error(vp.name+' footer proposal label missing');
+              if(!base.serviceText) throw new Error(vp.name+' service text missing');
+              if(base.areaText.includes('愛知')||base.areaText.includes('三重')) throw new Error(vp.name+' unverified regions still visible '+base.areaText);
+              if(base.flowTitle!=='ご相談のイメージ') throw new Error(vp.name+' flow title wrong '+base.flowTitle);
+
+              const expected=Math.round(stickyTopCss);
+              const stuckSamples=samples.filter(s=>Math.abs(s.top-expected)<=3);
+              if(stuckSamples.length<2) throw new Error(vp.name+' sticky did not hold '+JSON.stringify({expected,samples}));
 
               if(vp.w<=430){
-                if(base.stickyPosition!=='sticky') throw new Error(vp.name+' mobile sticky disabled: '+base.stickyPosition);
-                if(!['40%','150px','156px','172px'].includes(base.leftBasis) && parseFloat(base.leftBasis)<=0) throw new Error(vp.name+' bad left basis '+base.leftBasis);
+                if(base.stickyPosition!=='sticky') throw new Error(vp.name+' sticky disabled '+base.stickyPosition);
+                const lb=parseFloat(base.leftBasis), rb=parseFloat(base.rightBasis);
+                if(!(lb>0 && rb>0)) throw new Error(vp.name+' invalid flex basis '+base.leftBasis+'/'+base.rightBasis);
+                if(base.serviceFont<12.4) throw new Error(vp.name+' service text too small '+base.serviceFont);
               }
-              if(samples.length>=2){
-                const expected=Math.round(stickyTopCss);
-                const stuckSamples=samples.filter(s=>Math.abs(s.top-expected)<=3);
-                if(stuckSamples.length<2) throw new Error(vp.name+' sticky did not hold '+JSON.stringify({expected,samples}));
-              }
-
               await page.close();
             }
-            fs.writeFileSync('verify/diagnostic.json',JSON.stringify(results,null,2));
-            console.log(JSON.stringify(results,null,2));
+
+            // no-JS readability check
+            const nojs=await browser.newPage({viewport:{width:390,height:844},javaScriptEnabled:false});
+            await nojs.goto('https://harutabakery.ciao-st.com/site/ino-bankin-preview/?nojs=1',{waitUntil:'commit',timeout:30000}).catch(()=>{});
+            await nojs.waitForSelector('.service-panel',{state:'attached',timeout:30000});
+            const nojsResult=await nojs.evaluate(()=>({
+              serviceVisible:[...document.querySelectorAll('.service-panel')].every(el=>getComputedStyle(el).display!=='none' && el.textContent.trim().length>0),
+              companyVisible:!!document.querySelector('#company')?.textContent.includes('井野板金工業株式会社'),
+              contactVisible:!!document.querySelector('#contact')?.textContent.includes('058-294-8544'),
+              faqVisible:document.querySelectorAll('#faq details').length===3
+            }));
+            if(!Object.values(nojsResult).every(Boolean)) throw new Error('no-JS readability failed '+JSON.stringify(nojsResult));
+            await nojs.close();
+
+            fs.writeFileSync('verify-final/diagnostic.json',JSON.stringify({results,nojsResult},null,2));
+            console.log(JSON.stringify({results,nojsResult},null,2));
             await browser.close();
           })();
           NODE
       - uses: actions/upload-artifact@v4
         with:
-          name: ino-improvement-verification
-          path: verify/
+          name: ino-final-polish-verification
+          path: verify-final/
           retention-days: 1
