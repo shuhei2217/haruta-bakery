@@ -1,12 +1,14 @@
 name: Deploy Painting Demo Sites Dispatcher
 
 on:
+  schedule:
+    - cron: '*/5 * * * *'
   issues:
     types: [opened]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: xserver-deploy-paint-demos
@@ -15,19 +17,46 @@ concurrency:
 jobs:
   deploy:
     if: >
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.user.login == github.repository_owner &&
+      (github.event_name == 'issues' &&
+       github.event.issue.user.login == github.repository_owner &&
        startsWith(github.event.issue.title, '[deploy-paint]'))
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
     steps:
+      - name: Checkout control branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: control
+          fetch-depth: 0
+
       - name: Checkout painting demo branch
         uses: actions/checkout@v4
         with:
           ref: ino-bankin-preview
+          path: source
+
+      - name: Decide whether deployment is needed
+        id: decide
+        shell: bash
+        run: |
+          SOURCE_SHA="$(git -C source rev-parse HEAD)"
+          LAST_SHA="$(cat control/.github/deploy-state/paint-demos.sha 2>/dev/null || true)"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          if [ "\${{ github.event_name }}" = "schedule" ] && [ "$SOURCE_SHA" = "$LAST_SHA" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "No changes since last successful deployment."
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Deployment required."
+          fi
 
       - name: Build 10 demo sites
+        if: steps.decide.outputs.deploy == 'true'
+        working-directory: source
         run: |
           python3 .github/scripts/build_paint_demos.py
           test -f deploy-paint/hama-kensou/index.html
@@ -44,20 +73,23 @@ jobs:
           test -f deploy-paint/demo-shared/script.js
 
       - name: Install lftp
+        if: steps.decide.outputs.deploy == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
 
       - name: Deploy demo sites to XServer
+        if: steps.decide.outputs.deploy == 'true'
+        working-directory: source
         timeout-minutes: 8
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER: \${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: \${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: \${{ secrets.FTP_PASSWORD }}
         run: |
           set -u
           for attempt in 1 2 3; do
-            echo "Painting demos deploy attempt ${attempt}/3"
+            echo "Painting demos deploy attempt \${attempt}/3"
             if timeout 150s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
               set ftp:ssl-allow no;
               set ftp:passive-mode true;
@@ -72,7 +104,21 @@ jobs:
               exit 0
             fi
             rc=$?
-            echo "Painting demos deploy failed or timed out (exit ${rc})"
+            echo "Painting demos deploy failed or timed out (exit \${rc})"
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
           done
           exit 1
+
+      - name: Record successful deployment SHA
+        if: steps.decide.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          mkdir -p control/.github/deploy-state
+          printf '%s\n' "\${{ steps.decide.outputs.source_sha }}" > control/.github/deploy-state/paint-demos.sha
+          git -C control config user.name "github-actions[bot]"
+          git -C control config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C control add .github/deploy-state/paint-demos.sha
+          if ! git -C control diff --cached --quiet; then
+            git -C control commit -m "Record successful painting demo deployment"
+            git -C control push origin main
+          fi
