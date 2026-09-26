@@ -98,7 +98,8 @@ def build_site(src, c):
     rows = []
     for k,v in c["rows"]:
         if "電話" in k or k == "携帯":
-            rows.append(f'<div><dt>{esc(k)}</dt><dd><a href="tel:{digits}">{esc(v)}</a></dd></div>')
+            row_digits = re.sub(r"\\D", "", str(v))
+            rows.append(f'<div><dt>{esc(k)}</dt><dd><a href="tel:{row_digits}">{esc(v)}</a></dd></div>')
         else:
             rows.append(f'<div><dt>{esc(k)}</dt><dd>{esc(v)}</dd></div>')
     s = re.sub(r'<dl>[\s\S]*?</dl>', '<dl>' + ''.join(rows) + '</dl>', s, count=1)
