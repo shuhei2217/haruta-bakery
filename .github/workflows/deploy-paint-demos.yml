@@ -1,0 +1,78 @@
+name: Deploy Painting Demo Sites
+
+on:
+  push:
+    branches: [ino-bankin-preview]
+    paths:
+      - 'paint-demos/**'
+      - 'demo-shared/**'
+      - 'ino-bankin-preview/**'
+      - '.github/scripts/build_paint_demos.py'
+      - '.github/workflows/deploy-paint-demos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xserver-deploy-paint-demos
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout preview branch
+        uses: actions/checkout@v4
+
+      - name: Build 10 demo sites
+        run: |
+          python3 .github/scripts/build_paint_demos.py
+          test -f deploy-paint/hama-kensou/index.html
+          test -f deploy-paint/ryu-kogyo/index.html
+          test -f deploy-paint/souwa-paint/index.html
+          test -f deploy-paint/nagashima-paint/index.html
+          test -f deploy-paint/kei-kensou/index.html
+          test -f deploy-paint/color-works/index.html
+          test -f deploy-paint/tomo-tosou/index.html
+          test -f deploy-paint/yamashin/index.html
+          test -f deploy-paint/kubota-tosou/index.html
+          test -f deploy-paint/takizawa-tosou/index.html
+          test -f deploy-paint/demo-shared/styles.css
+          test -f deploy-paint/demo-shared/script.js
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy demo sites to XServer
+        timeout-minutes: 8
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            echo "Painting demos deploy attempt ${attempt}/3"
+            if timeout 150s lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" -e "
+              set ftp:ssl-allow no;
+              set ftp:passive-mode true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              set net:reconnect-interval-base 5;
+              set net:reconnect-interval-max 20;
+              mirror -R --verbose --parallel=2 deploy-paint/ ./;
+              bye
+            "; then
+              echo "Painting demos deploy succeeded"
+              exit 0
+            fi
+            rc=$?
+            echo "Painting demos deploy failed or timed out (exit ${rc})"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          exit 1
